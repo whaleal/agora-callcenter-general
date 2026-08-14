@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.agent_v2 import AgentV2
+from app.services.env_scope import agent_scope_filter, current_app_id
 
 router = APIRouter(prefix='/api/agents', tags=['agents'])
 
@@ -55,13 +56,13 @@ def _build_payload(body: CreateAgentRequest) -> dict:
                 'language': asr_lang,
             },
             'llm': {
-                'url': 'https://api.openai.com/v1/chat/completions',
-                'api_key': settings.openai_api_key,
+                'url': settings.openai_compatible_chat_completions_url,
+                'api_key': settings.effective_openai_api_key,
                 'system_messages': [{'role': 'system', 'content': body.system_content}],
                 'max_history': 32,
                 'greeting_message': body.greeting_message,
                 'failure_message': body.failure_message,
-                'params': {'model': 'gpt-5.4-nano'},
+                'params': {'model': settings.agent_llm_model},
             },
             'tts': {
                 'vendor': 'minimax',
@@ -156,7 +157,7 @@ def _record_from_data(data: dict) -> dict:
     return {
         'agent_id': data['agent_id'],
         'agent_name': data['agent_name'],
-        'app_id': data.get('app_id', settings.agora_project_id),
+        'app_id': data.get('app_id') or settings.agora_project_id,
         'system_content': system_content,
         'greeting_message': llm.get('greeting_message'),
         'failure_message': llm.get('failure_message'),
@@ -185,6 +186,7 @@ async def create_agent(body: CreateAgentRequest, db: AsyncSession = Depends(get_
         raise HTTPException(status_code=400, detail=result.get('message', result.get('detail', 'Agora API error')))
 
     fields = _record_from_data(result['data'])
+    fields['app_id'] = current_app_id()
     record = AgentV2(**fields)
     db.add(record)
     await db.commit()
@@ -194,7 +196,9 @@ async def create_agent(body: CreateAgentRequest, db: AsyncSession = Depends(get_
 
 @router.get('')
 async def list_agents(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(AgentV2).order_by(AgentV2.id.desc()))
+    result = await db.execute(
+        select(AgentV2).where(agent_scope_filter()).order_by(AgentV2.id.desc())
+    )
     rows = result.scalars().all()
     if not rows:
         return await sync_agents(db)
@@ -254,6 +258,7 @@ async def create_agent_with_properties(
         raise HTTPException(status_code=400, detail=result.get('message', result.get('detail', 'Agora API error')))
 
     fields = _record_from_data(result['data'])
+    fields['app_id'] = current_app_id()
     record = AgentV2(**fields)
     db.add(record)
     await db.commit()
@@ -291,7 +296,9 @@ async def sync_agents(db: AsyncSession = Depends(get_db)):
                 break
 
     if not agora_items:
-        result = await db.execute(select(AgentV2).order_by(AgentV2.id.desc()))
+        result = await db.execute(
+            select(AgentV2).where(agent_scope_filter()).order_by(AgentV2.id.desc())
+        )
         return [_serialize(r) for r in result.scalars().all()]
 
     # ── Step 2: 查询数据库已有记录 ────────────────────────────────
@@ -336,7 +343,7 @@ async def sync_agents(db: AsyncSession = Depends(get_db)):
                 stmt = stmt.on_conflict_do_update(
                     index_elements=['agent_id'],
                     set_={k: stmt.excluded[k] for k in (
-                        'agent_name', 'system_content', 'greeting_message',
+                        'agent_name', 'app_id', 'system_content', 'greeting_message',
                         'failure_message', 'voice_id', 'properties', 'updated_at',
                     )},
                 )
@@ -344,16 +351,25 @@ async def sync_agents(db: AsyncSession = Depends(get_db)):
         elif detail:
             rec = existing_records[aid]
             fields = _record_from_data(detail)
+            rec.agent_name = fields.get('agent_name') or rec.agent_name
+            rec.app_id = fields.get('app_id') or current_app_id()
             rec.system_content = fields['system_content']
             rec.greeting_message = fields['greeting_message']
             rec.failure_message = fields['failure_message']
             rec.voice_id = fields['voice_id']
             rec.properties = fields['properties']
             rec.updated_at = fields['updated_at']
+        else:
+            # 列表已有、无需详情：仍补齐本环境 app_id
+            rec = existing_records[aid]
+            if rec.app_id != current_app_id():
+                rec.app_id = current_app_id()
 
     await db.commit()
 
-    result = await db.execute(select(AgentV2).order_by(AgentV2.id.desc()))
+    result = await db.execute(
+        select(AgentV2).where(agent_scope_filter()).order_by(AgentV2.id.desc())
+    )
     return [_serialize(r) for r in result.scalars().all()]
 
 
@@ -426,7 +442,7 @@ async def update_agent_properties(
 ):
     result = await db.execute(select(AgentV2).where(AgentV2.agent_id == agent_id))
     record = result.scalar_one_or_none()
-    if not record:
+    if not record or record.app_id != current_app_id():
         raise HTTPException(status_code=404, detail='Agent not found')
 
     original_props = json.loads(record.properties) if record.properties else {}
@@ -464,7 +480,7 @@ async def update_agent_properties(
 async def delete_agent(agent_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AgentV2).where(AgentV2.agent_id == agent_id))
     record = result.scalar_one_or_none()
-    if not record:
+    if not record or record.app_id != current_app_id():
         raise HTTPException(status_code=404, detail='Agent not found')
 
     async with httpx.AsyncClient(timeout=15) as client:

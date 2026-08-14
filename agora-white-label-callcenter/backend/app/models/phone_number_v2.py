@@ -12,6 +12,8 @@ class PhoneNumberV2(Base):
     name: Mapped[str] = mapped_column(String(255))
     phone_number: Mapped[str] = mapped_column(String(64))
     type: Mapped[str] = mapped_column(String(32))
+    # 本环境归属：create 时 stamp；sync 时按 binding/campaign 引用补齐
+    app_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     sip_gateway_host: Mapped[str | None] = mapped_column(String(255), nullable=True)
     sip_signaling_port: Mapped[int | None] = mapped_column(Integer, nullable=True)
     outbound_protocol: Mapped[str | None] = mapped_column(String(32), nullable=True)

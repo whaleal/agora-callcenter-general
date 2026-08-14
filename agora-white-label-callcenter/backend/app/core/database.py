@@ -60,3 +60,5 @@ async def init_db() -> None:
 
     # campaigns_v2 column migrations
     await _ddl('ALTER TABLE campaigns_v2 ADD COLUMN IF NOT EXISTS total_numbers INTEGER')
+    await _ddl('ALTER TABLE campaigns_v2 ADD COLUMN IF NOT EXISTS app_id VARCHAR(64)')
+    await _ddl('ALTER TABLE phone_numbers_v2 ADD COLUMN IF NOT EXISTS app_id VARCHAR(64)')

@@ -1,1 +1,6 @@
 .claude/worktrees/
+
+# Release build artifacts
+dist/
+
+tmp*.json

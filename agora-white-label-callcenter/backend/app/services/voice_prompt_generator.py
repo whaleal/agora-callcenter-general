@@ -16,17 +16,8 @@ import base64
 import json
 from typing import AsyncIterator
 
-import anthropic
-import httpx
-
 from app.core.config import settings
-
-# Reusable client factory — disables SSL verification to work behind corporate proxies / VPNs
-def _make_anthropic_client() -> anthropic.AsyncAnthropic:
-    return anthropic.AsyncAnthropic(
-        api_key=settings.anthropic_api_key,
-        http_client=httpx.AsyncClient(verify=False),
-    )
+from app.core.llm import make_async_anthropic_client
 
 # Fixed section key order — assembly preserves this order, null values are skipped.
 # 'greeting' is intentionally excluded: it is a separate Voice Agent configuration field,
@@ -399,9 +390,9 @@ async def extract_structured_output_schema(prompt_text: str) -> dict:
     Extract the Structured Output variable schema from the generated Voice Agent Prompt.
     Returns a dict mapping variable names to their type/description/codes definitions.
     """
-    client = _make_anthropic_client()
+    client = make_async_anthropic_client()
     resp = await client.messages.create(
-        model='claude-sonnet-4-6',
+        model=settings.anthropic_model,
         max_tokens=2048,
         messages=[{
             'role': 'user',
@@ -431,7 +422,7 @@ async def generate_voice_prompt_stream(
     Caller should accumulate all chunks, then call parse_sections_json()
     and assemble_prompt_from_sections() to get the full prompt text.
     """
-    client = _make_anthropic_client()
+    client = make_async_anthropic_client()
     lang_instruction = _LANGUAGE_INSTRUCTIONS.get(language, '')
     base_prompt = _SYSTEM_PROMPT_SIMPLE if simplified else _SYSTEM_PROMPT
     system_prompt = base_prompt + lang_instruction
@@ -455,7 +446,7 @@ async def generate_voice_prompt_stream(
         content = [{'type': 'text', 'text': text + user_suffix}]
 
     async with client.messages.stream(
-        model='claude-sonnet-4-6',
+        model=settings.anthropic_model,
         max_tokens=64000,
         system=system_prompt,
         messages=[{'role': 'user', 'content': content}],

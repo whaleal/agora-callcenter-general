@@ -21,34 +21,68 @@ COPY backend/ .
 # Frontend static files
 COPY --from=frontend-build /build/frontend/dist /usr/share/nginx/html
 
-# nginx: serve SPA on :8080, proxy /api/ and /ws → uvicorn :8000
-RUN printf 'server {\n\
-    listen 8080;\n\
-    root /usr/share/nginx/html;\n\
-    index index.html;\n\
-    client_max_body_size 50M;\n\
-\n\
-    location /api/ {\n\
-        proxy_pass http://127.0.0.1:8000/api/;\n\
-        proxy_set_header Host $host;\n\
-        proxy_set_header X-Real-IP $remote_addr;\n\
-        proxy_http_version 1.1;\n\
-        proxy_set_header Upgrade $http_upgrade;\n\
-        proxy_set_header Connection "upgrade";\n\
-    }\n\
-\n\
-    location /ws {\n\
-        proxy_pass http://127.0.0.1:8000/ws;\n\
-        proxy_http_version 1.1;\n\
-        proxy_set_header Upgrade $http_upgrade;\n\
-        proxy_set_header Connection "upgrade";\n\
-        proxy_read_timeout 3600s;\n\
-    }\n\
-\n\
-    location / {\n\
-        try_files $uri $uri/ /index.html;\n\
-    }\n\
-}\n' > /etc/nginx/sites-enabled/default
+# nginx: match APP_VITE_BASE_PATH — subpath deploy needs /prefix/api + alias for static assets
+ARG APP_VITE_BASE_PATH=/
+RUN /bin/sh -c '\
+BASE="${APP_VITE_BASE_PATH:-/}"; \
+BASE="${BASE%/}"; \
+{ \
+  echo "server {"; \
+  echo "    listen 8080;"; \
+  echo "    root /usr/share/nginx/html;"; \
+  echo "    index index.html;"; \
+  echo "    client_max_body_size 50M;"; \
+  echo; \
+  if [ "$BASE" = "" ] || [ "$BASE" = "/" ]; then \
+    echo "    location /api/ {"; \
+    echo "        proxy_pass http://127.0.0.1:8000/api/;"; \
+    echo "        proxy_set_header Host \$host;"; \
+    echo "        proxy_set_header X-Real-IP \$remote_addr;"; \
+    echo "        proxy_http_version 1.1;"; \
+    echo "        proxy_set_header Upgrade \$http_upgrade;"; \
+    echo "        proxy_set_header Connection \"upgrade\";"; \
+    echo "    }"; \
+    echo; \
+    echo "    location /ws {"; \
+    echo "        proxy_pass http://127.0.0.1:8000/ws;"; \
+    echo "        proxy_http_version 1.1;"; \
+    echo "        proxy_set_header Upgrade \$http_upgrade;"; \
+    echo "        proxy_set_header Connection \"upgrade\";"; \
+    echo "        proxy_read_timeout 3600s;"; \
+    echo "    }"; \
+    echo; \
+    echo "    location / {"; \
+    echo "        try_files \$uri \$uri/ /index.html;"; \
+    echo "    }"; \
+  else \
+    echo "    location ${BASE}/api/ {"; \
+    echo "        proxy_pass http://127.0.0.1:8000/api/;"; \
+    echo "        proxy_set_header Host \$host;"; \
+    echo "        proxy_set_header X-Real-IP \$remote_addr;"; \
+    echo "        proxy_http_version 1.1;"; \
+    echo "        proxy_set_header Upgrade \$http_upgrade;"; \
+    echo "        proxy_set_header Connection \"upgrade\";"; \
+    echo "    }"; \
+    echo; \
+    echo "    location ${BASE}/ws {"; \
+    echo "        proxy_pass http://127.0.0.1:8000/ws;"; \
+    echo "        proxy_http_version 1.1;"; \
+    echo "        proxy_set_header Upgrade \$http_upgrade;"; \
+    echo "        proxy_set_header Connection \"upgrade\";"; \
+    echo "        proxy_read_timeout 3600s;"; \
+    echo "    }"; \
+    echo; \
+    echo "    location ${BASE}/ {"; \
+    echo "        alias /usr/share/nginx/html/;"; \
+    echo "        try_files \$uri \$uri/ ${BASE}/index.html;"; \
+    echo "    }"; \
+    echo; \
+    echo "    location = ${BASE} {"; \
+    echo "        return 301 ${BASE}/;"; \
+    echo "    }"; \
+  fi; \
+  echo "}"; \
+} > /etc/nginx/sites-enabled/default'
 
 # Entrypoint: start uvicorn then nginx (foreground)
 RUN printf '#!/bin/sh\nset -e\ncd /app/backend\nuvicorn app.main:app --host 127.0.0.1 --port 8000 &\nnginx -g "daemon off;"\n' \

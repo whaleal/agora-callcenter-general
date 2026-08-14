@@ -30,7 +30,7 @@ if [[ ! -f "$ENV_FILE" ]]; then
   echo "錯誤: 未找到 ${ENV_FILE}"
   echo "請先執行:"
   echo "  cp agora-white-label-callcenter/backend/.env.example .env"
-  echo "並填寫 AGORA_*、OPENAI_API_KEY、ANTHROPIC_API_KEY 等變量後重試。"
+  echo "並填寫 OPENROUTER_API_KEY、AGORA_* 等變量後重試。"
   exit 1
 fi
 

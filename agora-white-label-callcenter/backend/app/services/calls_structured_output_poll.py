@@ -25,16 +25,23 @@ async def poll_pending_structured_outputs_forever() -> None:
             try:
                 async with async_session_factory() as db:
                     from sqlalchemy import or_
+
+                    from app.models.campaign_v2 import CampaignV2
+                    from app.services.env_scope import campaign_scope_filter, load_local_agent_ids
+
+                    local_agent_ids = await load_local_agent_ids(db)
                     st = func.lower(func.coalesce(CallV2.structured_output_status, ''))
                     q = (
                         select(CallV2.call_id)
+                        .join(CampaignV2, CallV2.campaign_id == CampaignV2.campaign_id)
                         .where(
+                            campaign_scope_filter(local_agent_ids),
                             or_(
                                 ~st.in_(('completed', 'failed', 'disabled')),
                                 # transcript is always set (at minimum '[]') after a successful
                                 # detail fetch, so NULL means detail was never fetched yet.
                                 CallV2.transcript.is_(None),
-                            )
+                            ),
                         )
                         .order_by(CallV2.id.asc())
                         .limit(batch)

@@ -290,7 +290,7 @@ const en = {
     next_page: 'Next',
     fetching_calls: 'Loading call history...',
     no_calls: 'No call history yet',
-    no_calls_hint: 'Use the button above to pull from Agora and save to the database',
+    no_calls_hint: 'Use the button above to pull and save to the database',
     th_status: 'Status',
     th_to: 'To number',
     th_type: 'Type',

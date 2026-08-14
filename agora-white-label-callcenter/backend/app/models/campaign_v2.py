@@ -10,6 +10,8 @@ class CampaignV2(Base):
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     campaign_id: Mapped[str] = mapped_column(String(64), unique=True, index=True)
     campaign_name: Mapped[str] = mapped_column(String(255))
+    # 本环境归属：create 时 stamp；sync 时按 agent 归属补齐
+    app_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
 
     # 本地元数据（创建时填写，不发给 Agora）
     # create_agent_by_ai | existing_agent (new); file_upload | url_load (legacy)

@@ -11,6 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.phone_number_v2 import PhoneNumberV2
+from app.services.env_scope import (
+    agent_belongs_to_env,
+    current_app_id,
+    load_env_campaign_phone_ids,
+    load_local_agent_ids,
+    phone_belongs,
+    phone_scope_filter,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -91,7 +99,13 @@ async def _fetch_binding(client: httpx.AsyncClient, number_id: str) -> dict | No
 
 @router.get('')
 async def list_inbound_routing(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(PhoneNumberV2).order_by(PhoneNumberV2.id.desc()))
+    local_agent_ids = await load_local_agent_ids(db)
+    campaign_phone_ids = await load_env_campaign_phone_ids(db, local_agent_ids)
+    result = await db.execute(
+        select(PhoneNumberV2)
+        .where(phone_scope_filter(campaign_phone_ids))
+        .order_by(PhoneNumberV2.id.desc())
+    )
     numbers = result.scalars().all()
 
     async with httpx.AsyncClient(timeout=10) as client:
@@ -99,38 +113,74 @@ async def list_inbound_routing(db: AsyncSession = Depends(get_db)):
             _fetch_binding(client, n.number_id) for n in numbers
         ])
 
-    return [
-        {
+    out = []
+    for n, b in zip(numbers, bindings):
+        binding = b
+        if binding and binding.get('agent_id'):
+            if binding['agent_id'] not in local_agent_ids:
+                # 绑定到他环境 agent：不展示 binding，避免误操作
+                binding = None
+            elif not n.app_id:
+                n.app_id = current_app_id()
+        out.append({
             'number_id': n.number_id,
             'name': n.name,
             'phone_number': n.phone_number,
             'type': n.type,
-            'binding': b,
-        }
-        for n, b in zip(numbers, bindings)
-    ]
+            'binding': binding,
+        })
+    await db.commit()
+    return out
 
 
 @router.get('/{number_id}')
-async def get_inbound_routing(number_id: str):
+async def get_inbound_routing(number_id: str, db: AsyncSession = Depends(get_db)):
+    local_agent_ids = await load_local_agent_ids(db)
+    campaign_phone_ids = await load_env_campaign_phone_ids(db, local_agent_ids)
+    pn = (await db.execute(
+        select(PhoneNumberV2).where(PhoneNumberV2.number_id == number_id)
+    )).scalar_one_or_none()
+
     async with httpx.AsyncClient(timeout=10) as client:
         resp = await client.get(
             f'{PHONE_NUMBER_BASE_URL}/{number_id}/agent-binding',
             headers=_headers(),
         )
+        binding_agent_id = None
+        data = None
+        if resp.status_code == 200:
+            body = resp.json()
+            data = body.get('data') if isinstance(body, dict) and 'data' in body else body
+            if isinstance(data, dict):
+                binding_agent_id = data.get('agent_id')
+
+    if pn and not phone_belongs(
+        stamped_app_id=pn.app_id,
+        number_id=number_id,
+        binding_agent_id=binding_agent_id,
+        local_agent_ids=local_agent_ids,
+        campaign_phone_ids=campaign_phone_ids,
+    ):
+        raise HTTPException(status_code=404, detail='Phone number not found')
 
     if resp.status_code == 404:
         return {'binding': None}
     if resp.status_code != 200:
         raise HTTPException(status_code=resp.status_code, detail=resp.text)
 
-    body = resp.json()
-    data = body.get('data') if isinstance(body, dict) and 'data' in body else body
+    if binding_agent_id and binding_agent_id not in local_agent_ids:
+        return {'binding': None}
     return {'binding': data}
 
 
 @router.post('/{number_id}/bind')
-async def bind_phone_number(number_id: str, body: BindingRequest):
+async def bind_phone_number(number_id: str, body: BindingRequest, db: AsyncSession = Depends(get_db)):
+    if not await agent_belongs_to_env(db, body.agent_id):
+        raise HTTPException(
+            status_code=400,
+            detail='agent_id does not belong to the current environment app_id',
+        )
+
     payload = {
         'agent_id': body.agent_id,
         'end_call_config': body.end_call_config.model_dump(),
@@ -171,6 +221,14 @@ async def bind_phone_number(number_id: str, body: BindingRequest):
         msg = result.get('message') or result.get('detail') or json.dumps(result)
         logger.error('[inbound-routing] Agora returned error code %s: %s', code, msg)
         raise HTTPException(status_code=400, detail=f'Agora error (code={code}): {msg}')
+
+    # 成功绑定后补齐本环境 stamp
+    pn = (await db.execute(
+        select(PhoneNumberV2).where(PhoneNumberV2.number_id == number_id)
+    )).scalar_one_or_none()
+    if pn and pn.app_id != current_app_id():
+        pn.app_id = current_app_id()
+        await db.commit()
 
     return result
 

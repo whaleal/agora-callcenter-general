@@ -299,13 +299,18 @@ npm run dev
 | 变量 | 默认值 | 说明 |
 |------|--------|------|
 | `DATABASE_URL` | `sqlite+aiosqlite:///./dev.db` | 数据库连接（生产建议 `postgresql+asyncpg://...`） |
-| `ANTHROPIC_API_KEY` | — | Claude API 密钥（问卷解析、Prompt生成、配额推荐，必填） |
+| `OPENROUTER_API_KEY` | — | **推荐**：OpenRouter API Key，同时用于 Claude（Anthropic Messages）与 GPT（OpenAI 兼容协议） |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI 兼容协议基地址 |
+| `OPENROUTER_ANTHROPIC_BASE_URL` | `https://openrouter.ai/api` | Anthropic SDK / Messages 基地址 |
+| `ANTHROPIC_MODEL` | `anthropic/claude-sonnet-4.6` | Prompt 生成 / 配额推荐所用模型 |
+| `AGENT_LLM_MODEL` | `openai/gpt-4o-mini` | Agora Voice Agent 对话 LLM 模型 |
+| `ANTHROPIC_API_KEY` | — | 未配 OpenRouter 时的 Anthropic 官方密钥（兼容回退） |
 | `AGORA_CONVERSATIONAL_API_KEY` | — | 调用 Agora Conversational AI / SIP 外呼 REST API 的鉴权凭证（必填） |
 | `AGORA_PROJECT_ID` | — | Agora 项目 ID（必填） |
 | `AGORA_APP_CERTIFICATE` | — | Agora App 证书（用于生成 RTC/RTM Token 等） |
 | `AGORA_CONVERSATIONAL_BASE_URL` | `https://api.agora.io/conversational-ai/v2` | Agora Conversational AI API 基地址 |
-| `OPENAI_API_KEY` | — | Agent 对话 LLM 及转录配额提取所需（不填则配额转录评估轮询自动跳过） |
-| `QUOTA_TRANSCRIPT_MODEL` | `gpt-4o-mini` | 转录配额提取所用模型 |
+| `OPENAI_API_KEY` | — | 未配 OpenRouter 时的 OpenAI 官方密钥（兼容回退） |
+| `QUOTA_TRANSCRIPT_MODEL` | `openai/gpt-4o-mini` | 转录配额提取所用模型 |
 | `QUOTA_TRANSCRIPT_MIN_CONFIDENCE` | `0.5` | 判定命中所需的最低置信度（0-1） |
 | `POLL_INTERVAL_SECONDS` | `5` | 遗留字段（v1 轮询间隔，当前代码未使用） |
 | `MAX_CONCURRENT_CALLS` | `10` | 遗留字段（v1 并发外呼上限，当前代码未使用） |
@@ -353,7 +358,7 @@ npm run dev
 - **`quick-deploy.sh`**：一键构建部署脚本。
 
 ```bash
-# 首次部署前，准备根目录 .env（AGORA_*、ANTHROPIC_API_KEY、OPENAI_API_KEY 等）
+# 首次部署前，准备根目录 .env（AGORA_*、OPENROUTER_API_KEY 等）
 cp agora-white-label-callcenter/backend/.env.example .env
 vim .env
 

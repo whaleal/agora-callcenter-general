@@ -19,7 +19,16 @@ class Settings(BaseSettings):
     max_concurrent_calls: int = 10
     openai_api_key: str = ''
     minimax_api_key: str = ''
-    quota_transcript_model: str = 'gpt-4o-mini'
+
+    # OpenRouter（优先）：一套 key 同时走 OpenAI 兼容协议与 Anthropic Messages 协议
+    openrouter_api_key: str = ''
+    openrouter_base_url: str = 'https://openrouter.ai/api/v1'
+    openrouter_anthropic_base_url: str = 'https://openrouter.ai/api'
+
+    # 模型 ID（OpenRouter 使用 provider/model；直连官方时可改回官方名称）
+    anthropic_model: str = 'anthropic/claude-sonnet-4.6'
+    agent_llm_model: str = 'openai/gpt-4o-mini'
+    quota_transcript_model: str = 'openai/gpt-4o-mini'
     quota_transcript_min_confidence: float = 0.5
     structured_output_poll_interval_seconds: int = 20
     structured_output_poll_batch_size: int = 80
@@ -32,6 +41,38 @@ class Settings(BaseSettings):
     aws_s3_bucket: str = 'taiwanplus'
     aws_s3_region: str = 'ap-southeast-1'
     aws_s3_prefix: str = 'recordings/'
+
+    @property
+    def use_openrouter(self) -> bool:
+        return bool((self.openrouter_api_key or '').strip())
+
+    @property
+    def effective_openai_api_key(self) -> str:
+        """OpenAI 兼容调用：优先 OpenRouter，否则回退 OPENAI_API_KEY。"""
+        return (self.openrouter_api_key or self.openai_api_key or '').strip()
+
+    @property
+    def effective_anthropic_api_key(self) -> str:
+        """Anthropic Messages 调用：优先 OpenRouter，否则回退 ANTHROPIC_API_KEY。"""
+        return (self.openrouter_api_key or self.anthropic_api_key or '').strip()
+
+    @property
+    def openai_compatible_base_url(self) -> str | None:
+        if self.use_openrouter:
+            return self.openrouter_base_url.rstrip('/')
+        return None
+
+    @property
+    def openai_compatible_chat_completions_url(self) -> str:
+        if self.use_openrouter:
+            return f'{self.openrouter_base_url.rstrip("/")}/chat/completions'
+        return 'https://api.openai.com/v1/chat/completions'
+
+    @property
+    def anthropic_sdk_base_url(self) -> str | None:
+        if self.use_openrouter:
+            return self.openrouter_anthropic_base_url.rstrip('/')
+        return None
 
 
 settings = Settings()

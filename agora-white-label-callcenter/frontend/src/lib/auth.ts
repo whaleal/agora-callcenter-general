@@ -1,6 +1,6 @@
 const AUTH_KEY = 'cwc_auth'
-const VALID_USER = 'agora'
-const VALID_PASS = 'agora'
+const VALID_USER = 'jinmu'
+const VALID_PASS = 'jinmu'
 
 export function login(username: string, password: string): boolean {
   if (username === VALID_USER && password === VALID_PASS) {

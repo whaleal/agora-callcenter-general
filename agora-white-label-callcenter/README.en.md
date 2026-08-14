@@ -299,13 +299,18 @@ Open `http://localhost:5173` in your browser — you'll be redirected to the log
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `DATABASE_URL` | `sqlite+aiosqlite:///./dev.db` | Database connection (use `postgresql+asyncpg://...` in production) |
-| `ANTHROPIC_API_KEY` | — | Claude API key (required — questionnaire parsing, prompt generation, quota suggestion) |
+| `OPENROUTER_API_KEY` | — | **Recommended**: OpenRouter API key for both Claude (Anthropic Messages) and GPT (OpenAI-compatible) |
+| `OPENROUTER_BASE_URL` | `https://openrouter.ai/api/v1` | OpenAI-compatible API base URL |
+| `OPENROUTER_ANTHROPIC_BASE_URL` | `https://openrouter.ai/api` | Anthropic SDK / Messages base URL |
+| `ANTHROPIC_MODEL` | `anthropic/claude-sonnet-4.6` | Model for prompt generation / quota suggestion |
+| `AGENT_LLM_MODEL` | `openai/gpt-4o-mini` | Agora Voice Agent conversation LLM model |
+| `ANTHROPIC_API_KEY` | — | Direct Anthropic key fallback when OpenRouter is unset |
 | `AGORA_CONVERSATIONAL_API_KEY` | — | Credential for the Agora Conversational AI / SIP calling REST API (required) |
 | `AGORA_PROJECT_ID` | — | Agora project ID (required) |
 | `AGORA_APP_CERTIFICATE` | — | Agora App certificate (used for RTC/RTM token generation, etc.) |
 | `AGORA_CONVERSATIONAL_BASE_URL` | `https://api.agora.io/conversational-ai/v2` | Base URL for the Agora Conversational AI API |
-| `OPENAI_API_KEY` | — | Needed for the agent's conversation LLM and transcript-based quota extraction (if unset, the quota evaluation poller auto-skips) |
-| `QUOTA_TRANSCRIPT_MODEL` | `gpt-4o-mini` | Model used for transcript-based quota extraction |
+| `OPENAI_API_KEY` | — | Direct OpenAI key fallback when OpenRouter is unset |
+| `QUOTA_TRANSCRIPT_MODEL` | `openai/gpt-4o-mini` | Model used for transcript-based quota extraction |
 | `QUOTA_TRANSCRIPT_MIN_CONFIDENCE` | `0.5` | Minimum confidence (0-1) required to count a hit |
 | `POLL_INTERVAL_SECONDS` | `5` | Legacy field (v1 polling interval, unused by current code) |
 | `MAX_CONCURRENT_CALLS` | `10` | Legacy field (v1 concurrent-call cap, unused by current code) |
@@ -353,7 +358,7 @@ The repository root (one level above `agora-white-label-callcenter`) ships an al
 - **`quick-deploy.sh`** — one-command build & deploy script.
 
 ```bash
-# Before first deploy, prepare a root .env (AGORA_*, ANTHROPIC_API_KEY, OPENAI_API_KEY, etc.)
+# Before first deploy, prepare a root .env (AGORA_*, OPENROUTER_API_KEY, etc.)
 cp agora-white-label-callcenter/backend/.env.example .env
 vim .env
 

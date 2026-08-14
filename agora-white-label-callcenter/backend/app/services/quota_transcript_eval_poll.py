@@ -30,18 +30,24 @@ async def poll_running_campaigns_quota_transcript_eval_forever() -> None:
     try:
         while True:
             try:
-                if not (settings.openai_api_key or '').strip():
+                if not settings.effective_openai_api_key:
                     await asyncio.sleep(interval)
                     continue
 
                 async with async_session_factory() as db:
+                    from app.models.campaign_v2 import CampaignV2
+                    from app.services.env_scope import campaign_scope_filter, load_local_agent_ids
+
+                    local_agent_ids = await load_local_agent_ids(db)
                     pending_filter = or_(
                         CallV2.quota_checked.is_(False),
                         CallV2.quota_checked.is_(None),
                     )
                     q = (
                         select(CallV2.campaign_id)
+                        .join(CampaignV2, CallV2.campaign_id == CampaignV2.campaign_id)
                         .where(
+                            campaign_scope_filter(local_agent_ids),
                             CallV2.campaign_id.isnot(None),
                             CallV2.campaign_id != '',
                             pending_filter,

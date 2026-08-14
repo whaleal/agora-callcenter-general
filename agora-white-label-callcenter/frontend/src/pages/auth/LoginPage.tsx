@@ -4,9 +4,8 @@ import { Loader2, Eye, EyeOff, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { login } from '../../lib/auth'
 import { LANGUAGES, setLang, type Lang } from '../../i18n'
-import agoraLogo from '../../assets/agoralogo-small.png'
+import agoraLogo from '../../assets/logo.png'
 import taipeiBg from '../../assets/liberty.jpg'
-import twFlag from '../../assets/tw-flag.png'
 
 export function LoginPage() {
   const navigate = useNavigate()
@@ -42,7 +41,7 @@ export function LoginPage() {
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="flex flex-col items-center mb-8">
-          <img src={agoraLogo} alt="Agora" className="h-12 w-auto object-contain mb-3" />
+          <img src={agoraLogo} alt="Jinmu Info" className="h-12 w-auto object-contain mb-3" />
         </div>
 
         {/* Language selector */}
@@ -55,10 +54,7 @@ export function LoginPage() {
               onClick={() => setLangOpen(o => !o)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs text-gray-600 bg-white border border-gray-200 hover:border-gray-300 focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
             >
-              {currentLang.code === 'zh'
-                ? <img src={twFlag} alt="TW" className="w-4 h-auto" />
-                : <span className="text-sm leading-none">{currentLang.flag}</span>
-              }
+              <span className="text-sm leading-none">{currentLang.flag}</span>
               <span>{currentLang.label}</span>
               <ChevronDown size={12} className="text-gray-400" />
             </button>
@@ -73,10 +69,7 @@ export function LoginPage() {
                       i18n.language === code ? 'text-indigo-600 font-medium bg-indigo-50' : 'text-gray-600',
                     ].join(' ')}
                   >
-                    {code === 'zh'
-                      ? <img src={twFlag} alt="TW" className="w-4 h-auto" />
-                      : <span className="text-sm leading-none">{flag}</span>
-                    }
+                    <span className="text-sm leading-none">{flag}</span>
                     <span>{label}</span>
                   </button>
                 ))}

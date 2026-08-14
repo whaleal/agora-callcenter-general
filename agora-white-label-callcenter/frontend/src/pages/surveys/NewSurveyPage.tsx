@@ -14,7 +14,7 @@ const API = (import.meta.env.VITE_API_URL ?? import.meta.env.BASE_URL).replace(/
 
 interface PhoneNumberOption { number_id: string; name: string; phone_number: string }
 interface AgentOption { agent_id: string; agent_name: string }
-interface DialTask { phone_number: string }
+interface DialTask { phone_number: string; [variable: string]: string }
 interface CsvResult { valid: boolean; tasks: DialTask[]; errors: string[] }
 interface QCell { id: string; label: string; filters: Record<string, string>; target: number }
 
@@ -157,7 +157,12 @@ function parseCsv(text: string, t: TFunction): CsvResult {
     if (!phone) { errors.push(t('nc_wiz.csv_row_empty', { n: i + 1 })); continue }
     if (seen.has(phone)) { errors.push(t('nc_wiz.csv_row_dup', { n: i + 1, phone })); continue }
     seen.add(phone)
-    tasks.push({ phone_number: phone })
+    const task: DialTask = { phone_number: phone }
+    headers.forEach((h, idx) => {
+      if (idx === phoneIdx) return
+      task[h] = (cols[idx] ?? '').trim()
+    })
+    tasks.push(task)
   }
   return { valid: errors.length === 0 && tasks.length > 0, tasks, errors }
 }
@@ -451,7 +456,7 @@ export function NewSurveyPage() {
           agent_id: selectedAgentId,
           questionnaire_type: 'existing_agent',
           quota_mode: 'manual',
-          dial_tasks: csvResult.tasks.map(row => ({ phone_number: row.phone_number })),
+          dial_tasks: csvResult.tasks.map(row => ({ ...row })),
           start_immediately: startImmediately,
           ...(scheduleOption ? { schedule_option: scheduleOption } : {}),
           end_call_config: {

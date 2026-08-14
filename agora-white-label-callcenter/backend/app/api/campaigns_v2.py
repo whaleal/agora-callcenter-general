@@ -2,7 +2,7 @@ import json
 
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -11,6 +11,13 @@ from app.core.database import get_db
 from app.models.campaign_v2 import CampaignV2
 from app.models.calls_v2 import CallV2
 from app.models.phone_number_v2 import PhoneNumberV2
+from app.services.env_scope import (
+    agent_belongs_to_env,
+    campaign_belongs,
+    campaign_scope_filter,
+    current_app_id,
+    load_local_agent_ids,
+)
 
 router = APIRouter(prefix='/api/campaigns-v2', tags=['campaigns-v2'])
 
@@ -36,6 +43,8 @@ class EndCallConfig(BaseModel):
 
 
 class DialTask(BaseModel):
+    model_config = ConfigDict(extra='allow')
+
     phone_number: str
 
 
@@ -58,6 +67,7 @@ def _serialize(c: CampaignV2) -> dict:
         'id': c.id,
         'campaign_id': c.campaign_id,
         'campaign_name': c.campaign_name,
+        'app_id': c.app_id,
         'questionnaire_type': c.questionnaire_type,
         'quota_mode': c.quota_mode,
         'total_numbers': c.total_numbers,
@@ -151,6 +161,12 @@ async def _fetch_detail(client: httpx.AsyncClient, campaign_id: str) -> dict | N
 
 @router.post('')
 async def create_campaign(body: CreateCampaignRequest, db: AsyncSession = Depends(get_db)):
+    if not await agent_belongs_to_env(db, body.agent_id):
+        raise HTTPException(
+            status_code=400,
+            detail='agent_id does not belong to the current environment app_id',
+        )
+
     # Look up local phone number string before calling Agora
     pn_row = (await db.execute(
         select(PhoneNumberV2).where(PhoneNumberV2.number_id == body.phone_number_id)
@@ -161,7 +177,7 @@ async def create_campaign(body: CreateCampaignRequest, db: AsyncSession = Depend
         'campaign_name': body.campaign_name,
         'phone_number_id': body.phone_number_id,
         'agent_id': body.agent_id,
-        'dial_tasks': [{'phone_number': t.phone_number} for t in body.dial_tasks],
+        'dial_tasks': [t.model_dump() for t in body.dial_tasks],
         'start_immediately': body.start_immediately,
         'end_call_config': body.end_call_config.model_dump(),
         'enable_transcript': body.enable_transcript,
@@ -210,9 +226,13 @@ async def create_campaign(body: CreateCampaignRequest, db: AsyncSession = Depend
             'updated_at': data.get('updated_at'),
         }
     fields['total_numbers'] = total_numbers
+    fields['app_id'] = current_app_id()
 
     record = CampaignV2(**fields)
     db.add(record)
+    # 本环境 create 的号码一并补标（若尚未 stamp）
+    if pn_row and not pn_row.app_id:
+        pn_row.app_id = current_app_id()
     await db.commit()
     await db.refresh(record)
     out = _serialize(record)
@@ -220,13 +240,22 @@ async def create_campaign(body: CreateCampaignRequest, db: AsyncSession = Depend
     return out
 
 
-@router.get('')
-async def list_campaigns(db: AsyncSession = Depends(get_db)):
-    result = await db.execute(select(CampaignV2).order_by(CampaignV2.id.desc()))
+async def _list_env_campaigns(db: AsyncSession) -> list[dict]:
+    local_agent_ids = await load_local_agent_ids(db)
+    result = await db.execute(
+        select(CampaignV2)
+        .where(campaign_scope_filter(local_agent_ids))
+        .order_by(CampaignV2.id.desc())
+    )
     rows = result.scalars().all()
     ids = [r.campaign_id for r in rows]
     counts = await _calls_count_by_campaign_ids(db, ids)
     return [{**_serialize(r), 'calls_count': counts.get(r.campaign_id, 0)} for r in rows]
+
+
+@router.get('')
+async def list_campaigns(db: AsyncSession = Depends(get_db)):
+    return await _list_env_campaigns(db)
 
 
 @router.post('/sync')
@@ -234,8 +263,15 @@ async def sync_campaigns(db: AsyncSession = Depends(get_db)):
     """
     列表接口已包含完整字段（end_call_config、structured_output 等），
     直接用列表数据写库，无需再并发拉详情。
+    仅 upsert 属于本环境的 campaign（agent_id ∈ 本环境 agents）。
     响应结构：{ data: { list: [...] } }
     """
+    local_agent_ids = await load_local_agent_ids(db)
+    if not local_agent_ids:
+        from app.api.agents import sync_agents
+        await sync_agents(db)
+        local_agent_ids = await load_local_agent_ids(db)
+
     agora_items: list[dict] = []
     async with httpx.AsyncClient(timeout=15) as client:
         try:
@@ -252,24 +288,32 @@ async def sync_campaigns(db: AsyncSession = Depends(get_db)):
             pass
 
     if not agora_items:
-        result = await db.execute(select(CampaignV2).order_by(CampaignV2.id.desc()))
-        rows = result.scalars().all()
-        ids = [r.campaign_id for r in rows]
-        counts = await _calls_count_by_campaign_ids(db, ids)
-        return [{**_serialize(r), 'calls_count': counts.get(r.campaign_id, 0)} for r in rows]
+        return await _list_env_campaigns(db)
 
     existing_result = await db.execute(select(CampaignV2))
     existing: dict[str, CampaignV2] = {r.campaign_id: r for r in existing_result.scalars().all()}
+    app_id = current_app_id()
 
     for item in agora_items:
         cid = item.get('campaign_id')
         if not cid:
             continue
+        agent_id = item.get('agent_id')
+        existing_rec = existing.get(cid)
+        stamped = existing_rec.app_id if existing_rec else None
+        if not campaign_belongs(
+            stamped_app_id=stamped,
+            agent_id=agent_id,
+            local_agent_ids=local_agent_ids,
+        ):
+            continue
+
         if cid not in existing:
-            db.add(CampaignV2(**_fields_from_detail(item)))
+            fields = _fields_from_detail(item)
+            fields['app_id'] = app_id
+            db.add(CampaignV2(**fields))
         else:
             rec = existing[cid]
-            # 全量更新：列表已有完整字段
             fields = _fields_from_detail(item)
             rec.campaign_name = fields.get('campaign_name') or rec.campaign_name
             if fields.get('total_numbers') is not None:
@@ -290,13 +334,11 @@ async def sync_campaigns(db: AsyncSession = Depends(get_db)):
             rec.enable_recording = fields.get('enable_recording') if fields.get('enable_recording') is not None else rec.enable_recording
             rec.status = fields.get('status') or rec.status
             rec.updated_at = fields.get('updated_at') or rec.updated_at
+            if not rec.app_id:
+                rec.app_id = app_id
 
     await db.commit()
-    result = await db.execute(select(CampaignV2).order_by(CampaignV2.id.desc()))
-    rows = result.scalars().all()
-    ids = [r.campaign_id for r in rows]
-    counts = await _calls_count_by_campaign_ids(db, ids)
-    return [{**_serialize(r), 'calls_count': counts.get(r.campaign_id, 0)} for r in rows]
+    return await _list_env_campaigns(db)
 
 
 @router.get('/{campaign_id}')
@@ -308,12 +350,26 @@ async def get_campaign(
         description='If true, fetch latest fields from Agora then merge into DB (adds ~network RTT).',
     ),
 ):
+    local_agent_ids = await load_local_agent_ids(db)
     db_result = await db.execute(select(CampaignV2).where(CampaignV2.campaign_id == campaign_id))
     record = db_result.scalar_one_or_none()
     counts = await _calls_count_by_campaign_ids(db, [campaign_id])
 
+    def _in_scope(rec: CampaignV2 | None, agent_id: str | None = None) -> bool:
+        if rec is not None:
+            return campaign_belongs(
+                stamped_app_id=rec.app_id,
+                agent_id=rec.agent_id or agent_id,
+                local_agent_ids=local_agent_ids,
+            )
+        return campaign_belongs(
+            stamped_app_id=None,
+            agent_id=agent_id,
+            local_agent_ids=local_agent_ids,
+        )
+
     if not refresh_from_upstream:
-        if not record:
+        if not record or not _in_scope(record):
             raise HTTPException(status_code=404, detail='Campaign not found')
         return {**_serialize(record), 'calls_count': counts.get(campaign_id, 0)}
 
@@ -321,7 +377,10 @@ async def get_campaign(
         detail = await _fetch_detail(client, campaign_id)
 
     if detail:
+        detail_agent = detail.get('agent_id')
         if record:
+            if not _in_scope(record, detail_agent):
+                raise HTTPException(status_code=404, detail='Campaign not found')
             fields = _fields_from_detail(detail)
             record.status = fields.get('status') or record.status
             record.updated_at = fields.get('updated_at') or record.updated_at
@@ -329,17 +388,23 @@ async def get_campaign(
             record.phone_number_id = fields.get('phone_number_id') or record.phone_number_id
             record.agent_id = fields.get('agent_id') or record.agent_id
             record.agent_name = fields.get('agent_name') or record.agent_name
+            if not record.app_id and _in_scope(record):
+                record.app_id = current_app_id()
             await db.commit()
             await db.refresh(record)
             return {**_serialize(record), 'calls_count': counts.get(campaign_id, 0)}
         else:
-            new_record = CampaignV2(**_fields_from_detail(detail))
+            if not _in_scope(None, detail_agent):
+                raise HTTPException(status_code=404, detail='Campaign not found')
+            fields = _fields_from_detail(detail)
+            fields['app_id'] = current_app_id()
+            new_record = CampaignV2(**fields)
             db.add(new_record)
             await db.commit()
             await db.refresh(new_record)
             return {**_serialize(new_record), 'calls_count': counts.get(campaign_id, 0)}
 
-    if not record:
+    if not record or not _in_scope(record):
         raise HTTPException(status_code=404, detail='Campaign not found')
     return {**_serialize(record), 'calls_count': counts.get(campaign_id, 0)}
 

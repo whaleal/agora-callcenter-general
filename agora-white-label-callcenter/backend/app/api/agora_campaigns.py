@@ -9,26 +9,17 @@ from __future__ import annotations
 import json
 import logging
 
-import httpx
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from fastapi.responses import StreamingResponse
 
-import anthropic
-
 from app.core.config import settings
+from app.core.llm import make_async_anthropic_client
 from app.services.voice_prompt_generator import generate_voice_prompt_stream
 from app.services.parsers.docx_parser import extract_docx_text
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/api/agora-campaigns', tags=['agora-campaigns'])
-
-
-def _anthropic_client() -> anthropic.AsyncAnthropic:
-    return anthropic.AsyncAnthropic(
-        api_key=settings.anthropic_api_key,
-        http_client=httpx.AsyncClient(verify=False),
-    )
 
 
 # ── Text extraction ────────────────────────────────────────────────────────────
@@ -80,8 +71,8 @@ async def generate_voice_prompt(
     simplified: str = Form('false'),
 ):
     """Stream AI-generated Voice Agent interviewer prompt JSON."""
-    if not settings.anthropic_api_key:
-        raise HTTPException(503, detail='ANTHROPIC_API_KEY not configured')
+    if not settings.effective_anthropic_api_key:
+        raise HTTPException(503, detail='OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) not configured')
 
     file_data: bytes | None = None
     file_type: str | None = None
@@ -164,8 +155,8 @@ async def quota_suggest(
     language: str = Form('ko'),
 ):
     """Analyze questionnaire file or text and suggest quota cells using AI."""
-    if not settings.anthropic_api_key:
-        raise HTTPException(503, detail='ANTHROPIC_API_KEY not configured')
+    if not settings.effective_anthropic_api_key:
+        raise HTTPException(503, detail='OPENROUTER_API_KEY (or ANTHROPIC_API_KEY) not configured')
 
     questionnaire_text: str = ''
 
@@ -176,10 +167,10 @@ async def quota_suggest(
             # Use Claude's document vision for PDF
             import base64
             b64 = base64.standard_b64encode(file_data).decode()
-            client = _anthropic_client()
+            client = make_async_anthropic_client()
             try:
                 resp = await client.messages.create(
-                    model='claude-sonnet-4-6',
+                    model=settings.anthropic_model,
                     max_tokens=4096,
                     system=_QUOTA_SUGGEST_SYSTEM,
                     messages=[{
@@ -232,10 +223,10 @@ async def quota_suggest(
     if not questionnaire_text.strip():
         raise HTTPException(400, detail='No questionnaire content provided')
 
-    client = _anthropic_client()
+    client = make_async_anthropic_client()
     try:
         resp = await client.messages.create(
-            model='claude-sonnet-4-6',
+            model=settings.anthropic_model,
             max_tokens=4096,
             system=_QUOTA_SUGGEST_SYSTEM,
             messages=[{

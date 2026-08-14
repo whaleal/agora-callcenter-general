@@ -3,8 +3,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
 import { PlusCircle, Radio, PhoneCall, Bot, History, PhoneIncoming, BarChart2, LogOut, Settings, UserCircle2, FolderInput, ChevronDown } from 'lucide-react'
-import agoraLogo from '../assets/agora-logo-2.webp'
-import twFlag from '../assets/tw-flag.png'
+import agoraLogo from '../assets/logo.png'
 import { LANGUAGES, setLang, type Lang } from '../i18n'
 import { logout } from '../lib/auth'
 
@@ -57,7 +56,7 @@ export function Layout() {
           className="h-16 px-5 flex items-center justify-center border-b border-gray-100 cursor-default select-none flex-shrink-0"
           onClick={handleLogoClick}
         >
-          <img src={agoraLogo} alt="Agora" className="h-[42px] w-auto object-contain" />
+          <img src={agoraLogo} alt="Jinmu Info" className="h-[42px] w-auto object-contain" />
         </div>
 
         {/* Nav */}
@@ -102,10 +101,7 @@ export function Layout() {
               onClick={() => setLangOpen(o => !o)}
               className="flex items-center gap-2 w-full px-2.5 py-1.5 rounded-md text-xs text-gray-600 bg-white hover:bg-gray-50 border border-gray-200 transition-colors cursor-pointer"
             >
-              {currentLang.code === 'zh'
-                ? <img src={twFlag} alt="TW" className="w-4 h-auto" />
-                : <span className="text-sm leading-none">{currentLang.flag}</span>
-              }
+              <span className="text-sm leading-none">{currentLang.flag}</span>
               <span className="flex-1 text-left">{currentLang.label}</span>
               <ChevronDown size={12} className="text-gray-400" />
             </button>
@@ -120,10 +116,7 @@ export function Layout() {
                       i18n.language === code ? 'text-blue-700 font-medium bg-blue-50' : 'text-gray-600',
                     ].join(' ')}
                   >
-                    {code === 'zh'
-                      ? <img src={twFlag} alt="TW" className="w-4 h-auto" />
-                      : <span className="text-sm leading-none">{flag}</span>
-                    }
+                    <span className="text-sm leading-none">{flag}</span>
                     <span>{label}</span>
                   </button>
                 ))}

@@ -10,7 +10,9 @@ ENV_PATH = Path(__file__).parent.parent.parent / '.env'
 
 KEYS = [
     'DATABASE_URL',
+    'OPENROUTER_API_KEY',
     'ANTHROPIC_API_KEY',
+    'OPENAI_API_KEY',
     'AGORA_API_KEY',
     'AGORA_PIPELINE_ID',
     'AGORA_PHONE_NUMBER',
@@ -24,7 +26,9 @@ KEYS = [
 
 class SettingsPayload(BaseModel):
     DATABASE_URL: str = ''
+    OPENROUTER_API_KEY: str = ''
     ANTHROPIC_API_KEY: str = ''
+    OPENAI_API_KEY: str = ''
     AGORA_API_KEY: str = ''
     AGORA_PIPELINE_ID: str = ''
     AGORA_PHONE_NUMBER: str = ''

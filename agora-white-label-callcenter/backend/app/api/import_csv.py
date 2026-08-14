@@ -117,6 +117,7 @@ async def import_campaign_csv(
             db.add(CampaignV2(
                 campaign_id=cdata['campaign_id'],
                 campaign_name=cdata['campaign_name'],
+                app_id=settings.agora_project_id,
                 agent_id=cdata['agent_id'],
                 agent_name=cdata['agent_name'],
                 phone_number=cdata['phone_number'],

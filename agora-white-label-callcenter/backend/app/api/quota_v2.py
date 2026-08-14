@@ -181,8 +181,8 @@ async def eval_transcript_quota(
     extract dimensions, match quota_v2 cells, increment completed + hit_evidence, set
     calls_v2.quota_checked. Skips: empty transcript, call_category in no_answer, voicemail, failed.
     """
-    if not settings.openai_api_key:
-        raise HTTPException(503, detail='OPENAI_API_KEY 未配置')
+    if not settings.effective_openai_api_key:
+        raise HTTPException(503, detail='OPENROUTER_API_KEY (or OPENAI_API_KEY) 未配置')
     return await quota_transcript_eval.run_transcript_eval_for_campaign(
         db, campaign_id, limit=limit, prefetch_transcripts=prefetch,
     )

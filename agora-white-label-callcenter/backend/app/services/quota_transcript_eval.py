@@ -9,7 +9,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Any
 
-from openai import APIConnectionError, APITimeoutError, AsyncOpenAI, RateLimitError
+from openai import APIConnectionError, APITimeoutError, RateLimitError
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -17,6 +17,7 @@ from fastapi import HTTPException
 
 from app.api.calls_v2 import sync_calls_v2_upstream
 from app.core.config import settings
+from app.core.llm import make_async_openai_client
 from app.models.calls_v2 import CallV2
 from app.models.campaign_v2 import CampaignV2
 from app.models.quota_v2 import QuotaV2
@@ -201,17 +202,13 @@ async def _call_openai(
     cells_payload: list[dict],
     transcript_text: str,
 ) -> dict[str, Any]:
-    if not settings.openai_api_key:
-        raise RuntimeError('OPENAI_API_KEY 未配置')
+    if not settings.effective_openai_api_key:
+        raise RuntimeError('OPENROUTER_API_KEY (or OPENAI_API_KEY) 未配置')
     if not union_keys:
         raise ValueError('无配额 filter 维度，跳过')
 
     body = _build_json_schema_for_llm(union_keys)
-    client = AsyncOpenAI(
-        api_key=settings.openai_api_key,
-        timeout=120.0,
-        max_retries=1,
-    )
+    client = make_async_openai_client(timeout=120.0, max_retries=1)
     user_msg = f"""以下是对话转写：\n\n{transcript_text}"""
 
     resp = await client.chat.completions.create(

@@ -1,0 +1,43 @@
+# 生产部署（镜像模式）：不在远端 build，仅 docker load 后 up。
+# 配套 scripts/build-release.sh + scripts/deploy-remote.sh
+services:
+  agora-callcenter-postgres:
+    image: ${POSTGRES_IMAGE:-postgres:16-alpine}
+    container_name: agora-callcenter-postgres
+    environment:
+      POSTGRES_USER: campaign
+      POSTGRES_PASSWORD: campaign123
+      POSTGRES_DB: campaign_db
+    volumes:
+      - agora-callcenter-pgdata:/var/lib/postgresql/data
+    networks:
+      - whip-network
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U campaign -d campaign_db']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  agora-callcenter-app:
+    image: ${APP_IMAGE:-agora-callcenter-app:latest}
+    container_name: agora-callcenter-app
+    env_file:
+      - ./.env
+    environment:
+      DATABASE_URL: postgresql+asyncpg://campaign:campaign123@agora-callcenter-postgres:5432/campaign_db
+    ports:
+      - "${HOST_PORT:-8080}:8080"
+    networks:
+      - whip-network
+    depends_on:
+      agora-callcenter-postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  agora-callcenter-pgdata:
+
+networks:
+  whip-network:
+    external: true
