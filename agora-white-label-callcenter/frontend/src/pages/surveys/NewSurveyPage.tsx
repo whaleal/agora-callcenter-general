@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -301,8 +302,8 @@ export function NewSurveyPage() {
   const [createError, setCreateError] = useState('')
 
   useEffect(() => {
-    fetch(`${API}/api/phone-numbers`).then(r => r.json()).then(setPhoneNumbers).catch(() => {})
-    fetch(`${API}/api/agents`).then(r => r.json()).then(setAgents).catch(() => {})
+    authFetch(`${API}/api/phone-numbers`).then(r => r.json()).then(setPhoneNumbers).catch(() => {})
+    authFetch(`${API}/api/agents`).then(r => r.json()).then(setAgents).catch(() => {})
   }, [])
 
   // Pre-populate from duplicate
@@ -447,7 +448,7 @@ export function NewSurveyPage() {
           }),
       } : undefined
 
-      const resp = await fetch(`${API}/api/campaigns-v2`, {
+      const resp = await authFetch(`${API}/api/campaigns-v2`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -478,7 +479,7 @@ export function NewSurveyPage() {
       const campaign = await resp.json()
 
       if (quotaCells.length > 0 && campaign.campaign_id) {
-        await fetch(`${API}/api/quota-v2/${campaign.campaign_id}/cells`, {
+        await authFetch(`${API}/api/quota-v2/${campaign.campaign_id}/cells`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({

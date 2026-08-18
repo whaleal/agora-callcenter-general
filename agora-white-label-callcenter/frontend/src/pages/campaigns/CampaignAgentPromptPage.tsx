@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useCallback, useEffect, useState } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -33,7 +34,7 @@ export function CampaignAgentPromptPage() {
     setError('')
     setLoading(true)
     try {
-      const cResp = await fetch(`${API}/api/campaigns-v2/${campaignId}`)
+      const cResp = await authFetch(`${API}/api/campaigns-v2/${campaignId}`)
       if (!cResp.ok) {
         setError(t('campaign_agent_prompt.err_load'))
         return
@@ -45,7 +46,7 @@ export function CampaignAgentPromptPage() {
         setError(t('campaign_agent_prompt.err_no_agent'))
         return
       }
-      const agents: Agent[] = await fetch(`${API}/api/agents`).then(r => r.json())
+      const agents: Agent[] = await authFetch(`${API}/api/agents`).then(r => r.json())
       const a = agents.find(x => x.agent_id === aid)
       if (!a) {
         setError(t('campaign_agent_prompt.err_agent_missing'))
@@ -85,7 +86,7 @@ export function CampaignAgentPromptPage() {
     setUpdating(true)
     try {
       const rebuilt = sectionsToProps(sections, original)
-      const resp = await fetch(`${API}/api/agents/${agent.agent_id}/properties`, {
+      const resp = await authFetch(`${API}/api/agents/${agent.agent_id}/properties`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rebuilt),

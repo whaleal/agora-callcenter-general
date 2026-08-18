@@ -19,3 +19,9 @@ export function pct(completed: number, target: number): number {
   if (target === 0) return 0
   return Math.min(100, Math.round((completed / target) * 100))
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+export function isValidEmail(email: string): boolean {
+  return EMAIL_RE.test(email)
+}

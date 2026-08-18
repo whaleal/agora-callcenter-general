@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Loader2, PlusCircle, Trash2, PhoneCall, X } from 'lucide-react'
@@ -46,12 +47,12 @@ export function PhoneNumbersPage() {
   async function loadNumbers() {
     try {
       // 先从数据库快速加载
-      const dbData = await fetch(`${API}/api/phone-numbers`).then(r => r.json())
+      const dbData = await authFetch(`${API}/api/phone-numbers`).then(r => r.json())
       setNumbers(dbData)
       setLoading(false)
 
       // 同时在后台同步 Agora 列表，有新增记录时刷新
-      const synced = await fetch(`${API}/api/phone-numbers/sync`, { method: 'POST' }).then(r => r.json())
+      const synced = await authFetch(`${API}/api/phone-numbers/sync`, { method: 'POST' }).then(r => r.json())
       setNumbers(synced)
     } catch {
       setError(t('common.server_error'))
@@ -83,7 +84,7 @@ export function PhoneNumbersPage() {
       if (form.sip_signaling_port) payload.sip_signaling_port = Number(form.sip_signaling_port)
       if (form.outbound_protocol) payload.outbound_protocol = form.outbound_protocol
 
-      const resp = await fetch(`${API}/api/phone-numbers`, {
+      const resp = await authFetch(`${API}/api/phone-numbers`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -107,7 +108,7 @@ export function PhoneNumbersPage() {
     if (!confirm(t('phone_numbers.delete_confirm'))) return
     setDeletingId(numberId)
     try {
-      const resp = await fetch(`${API}/api/phone-numbers/${numberId}`, { method: 'DELETE' })
+      const resp = await authFetch(`${API}/api/phone-numbers/${numberId}`, { method: 'DELETE' })
       if (!resp.ok) throw new Error()
       setNumbers(prev => prev.filter(n => n.number_id !== numberId))
     } catch {

@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -137,7 +138,7 @@ export function PromptEditorPage() {
 
   const fetchData = useCallback(async () => {
     try {
-      const r = await fetch(`${API}/api/surveys/${id}/voice-prompt`)
+      const r = await authFetch(`${API}/api/surveys/${id}/voice-prompt`)
       const d: VoicePromptData = await r.json()
       setData(d)
 
@@ -179,7 +180,7 @@ export function PromptEditorPage() {
     if (schemaPollerRef.current) clearInterval(schemaPollerRef.current)
     schemaPollerRef.current = setInterval(async () => {
       try {
-        const r = await fetch(`${API}/api/surveys/${id}/voice-prompt`)
+        const r = await authFetch(`${API}/api/surveys/${id}/voice-prompt`)
         const d: VoicePromptData = await r.json()
         if (d.structured_output_schema) {
           setSchema(d.structured_output_schema)
@@ -204,7 +205,7 @@ export function PromptEditorPage() {
     setByteCount(0)
 
     try {
-      const resp = await fetch(`${API}/api/surveys/${id}/voice-prompt/generate?language=${i18n.language}`, {
+      const resp = await authFetch(`${API}/api/surveys/${id}/voice-prompt/generate?language=${i18n.language}`, {
         method: 'POST',
         signal: ctrl.signal,
       })
@@ -268,7 +269,7 @@ export function PromptEditorPage() {
     const sectionsJson = viewMode === 'sections' ? sectionsToJson(sections) : undefined
 
     try {
-      const resp = await fetch(`${API}/api/surveys/${id}/voice-prompt`, {
+      const resp = await authFetch(`${API}/api/surveys/${id}/voice-prompt`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ prompt: assembled, sections: sectionsJson, greeting, failure_message: failureMessage }),
@@ -285,7 +286,7 @@ export function PromptEditorPage() {
 
   async function handleSaveSchema(updated: StructuredOutputSchema) {
     try {
-      await fetch(`${API}/api/surveys/${id}/voice-prompt/schema`, {
+      await authFetch(`${API}/api/surveys/${id}/voice-prompt/schema`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ schema: updated }),
@@ -743,7 +744,7 @@ function SimulationModal({ surveyId, greeting, failureMessage, onClose }: { surv
     setMessages([...visibleMsgs, { role: 'assistant', content: '' }])
 
     try {
-      const resp = await fetch(`${API}/api/surveys/${surveyId}/voice-prompt/simulate`, {
+      const resp = await authFetch(`${API}/api/surveys/${surveyId}/voice-prompt/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ messages: apiMessages }),

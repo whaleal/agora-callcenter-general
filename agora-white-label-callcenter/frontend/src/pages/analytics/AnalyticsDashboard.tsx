@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -188,7 +189,7 @@ export function AnalyticsDashboard() {
     setLoading(true)
     setError('')
     try {
-      const data: StatsData = await fetch(`${API}/api/dashboard/stats`).then(r => {
+      const data: StatsData = await authFetch(`${API}/api/dashboard/stats`).then(r => {
         if (!r.ok) throw new Error(r.statusText)
         return r.json()
       })
@@ -204,7 +205,7 @@ export function AnalyticsDashboard() {
 
   const loadCampaigns = useCallback(async () => {
     try {
-      const data: CampaignV2Item[] = await fetch(`${API}/api/campaigns-v2`).then(r => r.json())
+      const data: CampaignV2Item[] = await authFetch(`${API}/api/campaigns-v2`).then(r => r.json())
       setRunningCampaigns(data.filter(c => (c.status ?? '').toLowerCase() === 'running'))
     } catch { /* ignore */ } finally {
       setCampaignsLoading(false)
@@ -222,7 +223,7 @@ export function AnalyticsDashboard() {
   async function handleInterrupt(campaignId: string) {
     setInterruptingId(campaignId)
     try {
-      const resp = await fetch(`${API}/api/campaigns-v2/${campaignId}/interrupt`, { method: 'POST' })
+      const resp = await authFetch(`${API}/api/campaigns-v2/${campaignId}/interrupt`, { method: 'POST' })
       if (!resp.ok) throw new Error()
       setRunningCampaigns(prev => prev.filter(c => c.campaign_id !== campaignId))
     } catch {

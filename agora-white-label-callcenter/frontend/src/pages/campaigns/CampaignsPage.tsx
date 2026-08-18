@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -108,10 +109,10 @@ export function CampaignsPage() {
 
   async function loadCampaigns() {
     try {
-      const dbData = await fetch(`${API}/api/campaigns-v2`).then(r => r.json())
+      const dbData = await authFetch(`${API}/api/campaigns-v2`).then(r => r.json())
       setCampaigns(dbData)
       setLoading(false)
-      const synced = await fetch(`${API}/api/campaigns-v2/sync`, { method: 'POST' }).then(r => r.json())
+      const synced = await authFetch(`${API}/api/campaigns-v2/sync`, { method: 'POST' }).then(r => r.json())
       setCampaigns(synced)
     } catch {
       setError(t('common.server_error'))
@@ -129,9 +130,9 @@ export function CampaignsPage() {
     if (!shouldPoll) return
     const timer = setInterval(async () => {
       try {
-        const dbData = await fetch(`${API}/api/campaigns-v2`).then(r => r.json())
+        const dbData = await authFetch(`${API}/api/campaigns-v2`).then(r => r.json())
         setCampaigns(dbData)
-        const synced = await fetch(`${API}/api/campaigns-v2/sync`, { method: 'POST' }).then(r => r.json())
+        const synced = await authFetch(`${API}/api/campaigns-v2/sync`, { method: 'POST' }).then(r => r.json())
         setCampaigns(synced)
       } catch { /* ignore */ }
     }, 5000)
@@ -141,7 +142,7 @@ export function CampaignsPage() {
   async function handleInterrupt(campaignId: string) {
     setInterruptingId(campaignId)
     try {
-      const resp = await fetch(`${API}/api/campaigns-v2/${campaignId}/interrupt`, { method: 'POST' })
+      const resp = await authFetch(`${API}/api/campaigns-v2/${campaignId}/interrupt`, { method: 'POST' })
       if (!resp.ok) throw new Error()
       setCampaigns(prev =>
         prev.map(c => c.campaign_id === campaignId ? { ...c, status: 'interrupted' } : c)
@@ -157,7 +158,7 @@ export function CampaignsPage() {
     if (!confirm(`確定要刪除匯入的 Campaign「${campaignName}」嗎？\n此操作將同時刪除所有相關通話記錄，且無法復原。`)) return
     setDeletingId(campaignId)
     try {
-      const resp = await fetch(`${API}/api/import/campaign/${campaignId}`, { method: 'DELETE' })
+      const resp = await authFetch(`${API}/api/import/campaign/${campaignId}`, { method: 'DELETE' })
       if (!resp.ok) throw new Error()
       setCampaigns(prev => prev.filter(c => c.campaign_id !== campaignId))
     } catch {
