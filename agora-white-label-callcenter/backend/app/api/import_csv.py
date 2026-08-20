@@ -16,6 +16,7 @@ from app.core.config import settings
 from app.core.database import AsyncSessionLocal, get_db
 from app.models.campaign_v2 import CampaignV2
 from app.models.calls_v2 import CallV2
+from app.models.call_usage import CallUsage
 
 router = APIRouter(prefix='/api/import', tags=['import'])
 
@@ -139,6 +140,7 @@ async def import_campaign_csv(
 
     calls_created = 0
     calls_skipped = 0
+    created_calls: list[CallV2] = []
 
     for row in rows:
         call_id = row.get('Call ID', '').strip()
@@ -159,7 +161,7 @@ async def import_campaign_csv(
         structured_output_status = 'completed' if structured_output_raw else None
         # Dashboard displays start_ts for "Call Start Time"; set both to the same value
         call_ts_ms = _parse_ts_ms(row.get('Call Start Time', ''))
-        db.add(CallV2(
+        call = CallV2(
             call_id=call_id,
             campaign_id=row.get('Campaign ID', '').strip(),
             agent_id=row.get('Agent ID', '').strip() or None,
@@ -181,10 +183,15 @@ async def import_campaign_csv(
             structured_output_status=structured_output_status,
             quota_checked=False,
             is_imported=True,
-        ))
+        )
+        db.add(call)
+        created_calls.append(call)
         calls_created += 1
 
     await db.commit()
+    if created_calls:
+        from app.services.call_usage import upsert_call_usage
+        await upsert_call_usage(db, created_calls)
     return {'campaigns_created': campaigns_created, 'calls_created': calls_created, 'calls_skipped': calls_skipped}
 
 
@@ -207,6 +214,7 @@ async def delete_imported_campaign(
     calls_deleted = (await db.execute(
         delete(CallV2).where(CallV2.campaign_id == campaign_id)
     )).rowcount
+    await db.execute(delete(CallUsage).where(CallUsage.campaign_id == campaign_id))
     await db.execute(delete(CampaignV2).where(CampaignV2.campaign_id == campaign_id))
     await db.commit()
 

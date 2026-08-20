@@ -28,6 +28,9 @@ async def init_db() -> None:
     from app.models.quota_v2 import QuotaV2  # noqa: F401
     from app.models.calls_v2 import CallV2  # noqa: F401
     from app.models.calls_v2_sync_state import CallV2SyncState  # noqa: F401
+    from app.models.user import EmailVerificationCode, User  # noqa: F401
+    from app.models.operation_log import OperationLog  # noqa: F401
+    from app.models.call_usage import CallUsage  # noqa: F401
 
     from sqlalchemy import text
 
