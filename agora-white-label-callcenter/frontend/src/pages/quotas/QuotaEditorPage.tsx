@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -81,9 +82,9 @@ export function QuotaEditorPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch(`${API}/api/surveys/${id}/quotas`).then(r => r.json()),
-      fetch(`${API}/api/surveys/${id}`).then(r => r.json()),
-      fetch(`${API}/api/surveys/${id}/phone-list/count`).then(r => r.json()),
+      authFetch(`${API}/api/surveys/${id}/quotas`).then(r => r.json()),
+      authFetch(`${API}/api/surveys/${id}`).then(r => r.json()),
+      authFetch(`${API}/api/surveys/${id}/phone-list/count`).then(r => r.json()),
     ])
       .then(([cellData, surveyData, phoneData]: [Cell[], { status: typeof surveyStatus }, { count: number }]) => {
         setCells(cellData)
@@ -107,7 +108,7 @@ export function QuotaEditorPage() {
     try {
       const form = new FormData()
       form.append('file', file)
-      const resp = await fetch(`${API}/api/surveys/${id}/phone-list`, { method: 'POST', body: form })
+      const resp = await authFetch(`${API}/api/surveys/${id}/phone-list`, { method: 'POST', body: form })
       if (!resp.ok) throw new Error()
       setPhoneCount(validation.count)
       setPhoneUploadMsg(t('quota_editor.phone_list_upload_ok', { n: validation.count }))
@@ -121,7 +122,7 @@ export function QuotaEditorPage() {
   const saveCells = useCallback(async (toSave: Cell[]) => {
     setSaveState('saving')
     try {
-      const resp = await fetch(`${API}/api/surveys/${id}/quotas`, {
+      const resp = await authFetch(`${API}/api/surveys/${id}/quotas`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(toSave.map(c => ({ id: c.id, target: c.target }))),
@@ -150,7 +151,7 @@ export function QuotaEditorPage() {
     setAiResult(null)
     setErrorMsg('')
     try {
-      const resp = await fetch(`${API}/api/surveys/${id}/quotas/ai-suggest`, { method: 'POST' })
+      const resp = await authFetch(`${API}/api/surveys/${id}/quotas/ai-suggest`, { method: 'POST' })
       if (!resp.ok) {
         const err = await resp.json()
         throw new Error(err.detail || t('common.error_occurred'))
@@ -161,7 +162,7 @@ export function QuotaEditorPage() {
         screening_rules: data.screening_rules,
         notes: data.notes,
       })
-      const fresh = await fetch(`${API}/api/surveys/${id}/quotas`).then(r => r.json())
+      const fresh = await authFetch(`${API}/api/surveys/${id}/quotas`).then(r => r.json())
       setCells(fresh)
       latestCellsRef.current = fresh
     } catch (e) {
@@ -181,7 +182,7 @@ export function QuotaEditorPage() {
     const timeoutId = setTimeout(() => ctrl.abort(), 65_000)
 
     try {
-      const resp = await fetch(`${API}/api/surveys/${id}/quotas/ai-requirements`, {
+      const resp = await authFetch(`${API}/api/surveys/${id}/quotas/ai-requirements`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requirements }),

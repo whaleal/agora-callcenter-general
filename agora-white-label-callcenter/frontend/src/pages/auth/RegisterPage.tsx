@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Loader2, Eye, EyeOff, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { login, requestVerificationCode } from '../../lib/auth'
+import { register, requestVerificationCode } from '../../lib/auth'
 import { isValidEmail } from '../../lib/utils'
 import { LANGUAGES, setLang, type Lang } from '../../i18n'
 import agoraLogo from '../../assets/logo.png'
@@ -10,12 +10,14 @@ import taipeiBg from '../../assets/liberty.jpg'
 
 const CODE_COUNTDOWN_SECONDS = 60
 
-export function LoginPage() {
+export function RegisterPage() {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
+  const [username, setUsername] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
+  const [appId, setAppId] = useState('')
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [emailTouched, setEmailTouched] = useState(false)
@@ -36,17 +38,17 @@ export function LoginPage() {
   async function handleGetCode() {
     setError('')
     setEmailTouched(true)
-    if (!email.trim() || !password) {
-      setError(t('login.email_password_required'))
+    if (!email.trim()) {
+      setError(t('register.email_required'))
       return
     }
     if (!isValidEmail(email.trim())) {
-      setError(t('login.email_invalid'))
+      setError(t('register.email_invalid'))
       return
     }
     setSendingCode(true)
     try {
-      await requestVerificationCode(email.trim(), 'login', password)
+      await requestVerificationCode(email.trim(), 'register')
       setCountdown(CODE_COUNTDOWN_SECONDS)
       timerRef.current = setInterval(() => {
         setCountdown(c => {
@@ -58,7 +60,7 @@ export function LoginPage() {
         })
       }, 1000)
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('login.code_error'))
+      setError(err instanceof Error ? err.message : t('register.code_error'))
     } finally {
       setSendingCode(false)
     }
@@ -69,15 +71,15 @@ export function LoginPage() {
     setError('')
     setEmailTouched(true)
     if (!isValidEmail(email.trim())) {
-      setError(t('login.email_invalid'))
+      setError(t('register.email_invalid'))
       return
     }
     setLoading(true)
     try {
-      await login(email.trim(), password, code.trim())
-      navigate('/dashboard', { replace: true })
+      await register(username.trim(), email.trim(), password, code.trim(), appId.trim())
+      navigate('/login', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : t('login.error'))
+      setError(err instanceof Error ? err.message : t('register.error'))
       setLoading(false)
     }
   }
@@ -126,43 +128,57 @@ export function LoginPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
           <div className="flex flex-col items-center">
             <img src={agoraLogo} alt="Jinmu Info" className="h-12 w-auto object-contain mb-3" />
-            <h1 className="text-2xl font-semibold text-gray-900 mb-6">{t('login.title')}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-6">{t('register.title')}</h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                {t('login.email')}
+                {t('register.username')}
+              </label>
+              <input
+                type="text"
+                value={username}
+                onChange={e => setUsername(e.target.value)}
+                placeholder={t('register.username_ph')}
+                autoComplete="username"
+                autoFocus
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white transition-shadow"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                {t('register.email')}
               </label>
               <input
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 onBlur={() => setEmailTouched(true)}
-                placeholder={t('login.email_ph')}
+                placeholder={t('register.email_ph')}
                 autoComplete="email"
-                autoFocus
                 className={[
                   'w-full border rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:border-transparent bg-white transition-shadow',
                   emailInvalid ? 'border-red-300 focus:ring-red-500' : 'border-gray-200 focus:ring-indigo-500',
                 ].join(' ')}
               />
               {emailInvalid && (
-                <p className="mt-1 text-xs text-red-600">{t('login.email_invalid')}</p>
+                <p className="mt-1 text-xs text-red-600">{t('register.email_invalid')}</p>
               )}
             </div>
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                {t('login.password')}
+                {t('register.password')}
               </label>
               <div className="relative">
                 <input
                   type={showPw ? 'text' : 'password'}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
-                  placeholder={t('login.password_ph')}
-                  autoComplete="current-password"
+                  placeholder={t('register.password_ph')}
+                  autoComplete="new-password"
                   className="w-full border border-gray-200 rounded-lg px-3 py-2.5 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white transition-shadow"
                 />
                 <button
@@ -177,14 +193,27 @@ export function LoginPage() {
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                {t('login.code')}
+                {t('register.app_id')}
+              </label>
+              <input
+                type="text"
+                value={appId}
+                onChange={e => setAppId(e.target.value)}
+                placeholder={t('register.app_id_ph')}
+                className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white transition-shadow"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                {t('register.code')}
               </label>
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={code}
                   onChange={e => setCode(e.target.value)}
-                  placeholder={t('login.code_ph')}
+                  placeholder={t('register.code_ph')}
                   autoComplete="one-time-code"
                   className="flex-1 min-w-0 border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white transition-shadow"
                 />
@@ -197,9 +226,9 @@ export function LoginPage() {
                   {sendingCode ? (
                     <Loader2 size={14} className="animate-spin mx-auto" />
                   ) : countdown > 0 ? (
-                    t('login.resend_code', { s: countdown })
+                    t('register.resend_code', { s: countdown })
                   ) : (
-                    t('login.get_code')
+                    t('register.get_code')
                   )}
                 </button>
               </div>
@@ -213,17 +242,17 @@ export function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || !email || !password || !code || !isValidEmail(email.trim())}
+              disabled={loading || !username || !email || !password || !code || !appId || !isValidEmail(email.trim())}
               className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
             >
               {loading && <Loader2 size={15} className="animate-spin" />}
-              {loading ? t('login.submitting') : t('login.submit')}
+              {loading ? t('register.submitting') : t('register.submit')}
             </button>
 
             <p className="text-center text-sm text-gray-500">
-              {t('login.no_account')}{' '}
-              <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                {t('login.sign_up')}
+              {t('register.have_account')}{' '}
+              <Link to="/login" className="text-indigo-600 hover:text-indigo-700 font-medium">
+                {t('register.sign_in')}
               </Link>
             </p>
           </form>

@@ -2,10 +2,10 @@ import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
-import { PlusCircle, Radio, PhoneCall, Bot, History, PhoneIncoming, BarChart2, LogOut, Settings, UserCircle2, FolderInput, ChevronDown } from 'lucide-react'
+import { PlusCircle, Radio, PhoneCall, Bot, History, PhoneIncoming, BarChart2, LogOut, Settings, UserCircle2, FolderInput, ChevronDown, ScrollText } from 'lucide-react'
 import agoraLogo from '../assets/logo.png'
 import { LANGUAGES, setLang, type Lang } from '../i18n'
-import { logout } from '../lib/auth'
+import { getUser, logout } from '../lib/auth'
 
 const UNLOCK_CLICKS = 5
 const SESSION_KEY = 'import_unlocked'
@@ -19,6 +19,7 @@ export function Layout() {
   const [importUnlocked, setImportUnlocked] = useState(
     () => sessionStorage.getItem(SESSION_KEY) === '1'
   )
+  const user = getUser()
 
   function handleLogoClick() {
     if (importUnlocked) return
@@ -44,6 +45,7 @@ export function Layout() {
     { to: '/phone-numbers',   label: t('app_nav.phone_numbers'),   icon: PhoneCall },
     { to: '/agents',          label: t('app_nav.agents'),          icon: Bot },
     { to: '/call-history',    label: t('app_nav.call_history'),    icon: History },
+    { to: '/login-logs',      label: t('app_nav.login_logs'),      icon: ScrollText },
     ...(importUnlocked ? [{ to: '/import', label: t('app_nav.import'), icon: FolderInput }] : []),
   ]
 
@@ -132,7 +134,7 @@ export function Layout() {
               <UserCircle2 size={15} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-xs font-medium text-gray-800 truncate">Admin</p>
+              <p className="text-xs font-medium text-gray-800 truncate">{user?.username ?? 'Admin'}</p>
               <p className="text-[10px] text-gray-400 truncate">Administrator</p>
             </div>
             <NavLink

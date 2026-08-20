@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -31,7 +32,7 @@ export function SurveyListPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid')
 
   useEffect(() => {
-    fetch(`${API}/api/surveys`)
+    authFetch(`${API}/api/surveys`)
       .then(r => r.json())
       .then(setSurveys)
       .catch(() => setError(t('common.server_error')))
@@ -55,7 +56,7 @@ export function SurveyListPage() {
     setDuplicatingId(duplicateModal.id)
     setDuplicateModal(null)
     try {
-      const resp = await fetch(`${API}/api/surveys/${duplicateModal.id}/duplicate`, {
+      const resp = await authFetch(`${API}/api/surveys/${duplicateModal.id}/duplicate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name }),
@@ -74,7 +75,7 @@ export function SurveyListPage() {
     if (!window.confirm(t('survey_list.confirm_delete'))) return
     setDeletingId(id)
     try {
-      const resp = await fetch(`${API}/api/surveys/${id}`, { method: 'DELETE' })
+      const resp = await authFetch(`${API}/api/surveys/${id}`, { method: 'DELETE' })
       if (!resp.ok) throw new Error()
       setSurveys(prev => prev.filter(s => s.id !== id))
     } catch {

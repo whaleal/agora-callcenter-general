@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -62,7 +63,7 @@ export function CallHistoryPage() {
     let cancelled = false
     setLoading(true)
     setError('')
-    fetch(`${API}/api/calls-v2/?page=${page}&page_size=${PAGE_SIZE}`)
+    authFetch(`${API}/api/calls-v2/?page=${page}&page_size=${PAGE_SIZE}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()

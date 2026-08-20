@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -71,8 +72,8 @@ export function QuotaInsightPage() {
       }
       try {
         const [cellData, campData] = await Promise.all([
-          fetch(`${API}/api/quota-v2/${id}/cells`).then(r => r.json()),
-          fetch(`${API}/api/campaigns-v2/${id}`).then(r => r.json()),
+          authFetch(`${API}/api/quota-v2/${id}/cells`).then(r => r.json()),
+          authFetch(`${API}/api/campaigns-v2/${id}`).then(r => r.json()),
         ])
         if (cancelled) {
           return
