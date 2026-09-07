@@ -68,10 +68,6 @@ export function PhoneNumbersPage() {
       setFormError(t('phone_numbers.form_name_phone_required'))
       return
     }
-    if (!/^\+\d{7,15}$/.test(form.phone_number.trim())) {
-      setFormError('Phone number must be in E.164 format, e.g. +12013040791')
-      return
-    }
     setSubmitting(true)
     try {
       const payload: Record<string, unknown> = {

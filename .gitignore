@@ -3,4 +3,8 @@
 # Release build artifacts
 dist/
 
-tmp*.json
+tmp*
+*.xlsx
+*.csv
+.env
+.DS_Store

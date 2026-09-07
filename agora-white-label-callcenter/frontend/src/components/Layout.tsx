@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { NavLink, Outlet, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { cn } from '../lib/utils'
-import { PlusCircle, Radio, PhoneCall, Bot, History, PhoneIncoming, BarChart2, LogOut, Settings, UserCircle2, FolderInput, ChevronDown } from 'lucide-react'
+import { BookOpen, PlusCircle, Radio, PhoneCall, Bot, History, PhoneIncoming, BarChart2, LogOut, Settings, UserCircle2, FolderInput, ChevronDown } from 'lucide-react'
 import agoraLogo from '../assets/logo.png'
 import { LANGUAGES, setLang, type Lang } from '../i18n'
 import { logout } from '../lib/auth'
@@ -44,6 +44,7 @@ export function Layout() {
     { to: '/phone-numbers',   label: t('app_nav.phone_numbers'),   icon: PhoneCall },
     { to: '/agents',          label: t('app_nav.agents'),          icon: Bot },
     { to: '/call-history',    label: t('app_nav.call_history'),    icon: History },
+    { to: '/case-study',      label: t('app_nav.case_study'),      icon: BookOpen },
     ...(importUnlocked ? [{ to: '/import', label: t('app_nav.import'), icon: FolderInput }] : []),
   ]
 

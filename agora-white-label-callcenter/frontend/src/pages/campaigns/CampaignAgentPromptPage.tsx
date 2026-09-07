@@ -3,14 +3,18 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ArrowLeft, Bot, Loader2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
+import { AgentPropertiesEditor } from '../agents/AgentPropertiesEditor'
 import {
   extractSections,
+  extractSimpleFieldsFromProps,
   sectionsToProps,
-  JsonPropsEditor,
-  type JsonSections,
-  type JsonSectionErrors,
+  validateSections,
   type Agent,
-} from '../agents/AgentsPage'
+  type EditorMode,
+  type JsonSectionErrors,
+  type JsonSections,
+  type SimpleAgentFields,
+} from '../agents/agentProperties'
 
 const API = (import.meta.env.VITE_API_URL ?? import.meta.env.BASE_URL).replace(/\/$/, '')
 
@@ -25,6 +29,8 @@ export function CampaignAgentPromptPage() {
   const [original, setOriginal] = useState<Record<string, unknown>>({})
   const [sections, setSections] = useState<JsonSections | null>(null)
   const [sectionErrors, setSectionErrors] = useState<JsonSectionErrors>({})
+  const [mode, setMode] = useState<EditorMode>('ui')
+  const [simple, setSimple] = useState<SimpleAgentFields | null>(null)
   const [updating, setUpdating] = useState(false)
   const [saveError, setSaveError] = useState('')
 
@@ -55,6 +61,8 @@ export function CampaignAgentPromptPage() {
       const orig = (a.properties ?? {}) as Record<string, unknown>
       setOriginal(JSON.parse(JSON.stringify(orig)) as Record<string, unknown>)
       setSections(extractSections(orig))
+      setSimple(extractSimpleFieldsFromProps(orig))
+      setMode('ui')
     } catch {
       setError(t('campaign_agent_prompt.err_network'))
     } finally {
@@ -68,17 +76,10 @@ export function CampaignAgentPromptPage() {
     if (!agent || !sections) return
     setSaveError('')
 
-    // Validate all sections
-    const errors: JsonSectionErrors = {}
-    let hasErrors = false
-    for (const key of Object.keys(sections) as (keyof JsonSections)[]) {
-      try { JSON.parse(sections[key]) } catch {
-        errors[key] = 'Invalid JSON'
-        hasErrors = true
-      }
-    }
-    if (hasErrors) {
+    const errors = validateSections(sections)
+    if (Object.keys(errors).length > 0) {
       setSectionErrors(errors)
+      setMode('json')
       return
     }
 
@@ -170,7 +171,7 @@ export function CampaignAgentPromptPage() {
       </div>
 
       <div className="mb-3 flex-shrink-0 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-        {t('campaign_agent_prompt.sensitive_hint')}
+        {mode === 'json' ? t('campaign_agent_prompt.sensitive_hint') : t('agents.props_ui_hint')}
       </div>
 
       {saveError && (
@@ -180,16 +181,23 @@ export function CampaignAgentPromptPage() {
       )}
 
       <div className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-gray-100 bg-white p-4 shadow-sm">
-        <JsonPropsEditor
-          sections={sections}
-          errors={sectionErrors}
-          onChange={(key, value) => {
-            let sectionError: string | undefined
-            try { JSON.parse(value) } catch { sectionError = 'Invalid JSON' }
-            setSections(prev => prev ? { ...prev, [key]: value } : null)
-            setSectionErrors(prev => ({ ...prev, [key]: sectionError }))
-          }}
-        />
+        {simple && (
+          <AgentPropertiesEditor
+            mode={mode}
+            onModeChange={setMode}
+            sections={sections}
+            errors={sectionErrors}
+            onSectionChange={(key, value) => {
+              let sectionError: string | undefined
+              try { JSON.parse(value) } catch { sectionError = 'Invalid JSON' }
+              setSections(prev => prev ? { ...prev, [key]: value } : null)
+              setSectionErrors(prev => ({ ...prev, [key]: sectionError }))
+            }}
+            onReplaceSections={setSections}
+            simple={simple}
+            onSimpleChange={setSimple}
+          />
+        )}
       </div>
     </div>
   )

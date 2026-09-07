@@ -1,78 +1,29 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Loader2, PlusCircle, Trash2, Bot, X, Pencil, ChevronDown, ChevronRight,
+  Loader2, PlusCircle, Trash2, Bot, X, Pencil,
   FileText, MessageCircle, Radio,
 } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import { bcp47ForI18n } from '../../i18n'
 import AgoraRTC from 'agora-rtc-sdk-ng'
 import AgoraRTM from 'agora-rtm-sdk'
+import { AgentPropertiesEditor } from './AgentPropertiesEditor'
+import {
+  DEFAULT_SIMPLE_FIELDS,
+  extractSections,
+  extractSimpleFieldsFromProps,
+  makeDefaultSections,
+  sectionsToProps,
+  validateSections,
+  type Agent,
+  type EditorMode,
+  type JsonSectionErrors,
+  type JsonSections,
+  type SimpleAgentFields,
+} from './agentProperties'
 
 const API = (import.meta.env.VITE_API_URL ?? import.meta.env.BASE_URL).replace(/\/$/, '')
-
-// ── Types ─────────────────────────────────────────────────────────
-export interface Agent {
-  id: number
-  agent_id: string
-  agent_name: string
-  app_id: string
-  system_content: string | null
-  greeting_message: string | null
-  failure_message: string | null
-  voice_id: string | null
-  properties: Record<string, unknown> | null
-  created_at: string | null
-}
-
-// ── JSON section editor types ──────────────────────────────────────
-export type SectionKey = 'llm' | 'tts' | 'asr' | 'parameters' | 'turn_detection' | 'advanced_features'
-
-export interface JsonSections {
-  llm: string
-  tts: string
-  asr: string
-  parameters: string
-  turn_detection: string
-  advanced_features: string
-}
-
-export type JsonSectionErrors = Partial<Record<SectionKey, string>>
-
-const SECTIONS: { key: SectionKey; label: string; border: string; rows: number }[] = [
-  { key: 'llm',               label: 'LLM',               border: 'border-l-indigo-500', rows: 22 },
-  { key: 'tts',               label: 'TTS',               border: 'border-l-purple-500', rows: 14 },
-  { key: 'asr',               label: 'ASR',               border: 'border-l-emerald-500', rows: 6  },
-  { key: 'parameters',        label: 'Parameters',        border: 'border-l-amber-500',  rows: 14 },
-  { key: 'turn_detection',    label: 'Turn Detection',    border: 'border-l-blue-500',   rows: 16 },
-  { key: 'advanced_features', label: 'Advanced Features', border: 'border-l-gray-400',   rows: 6  },
-]
-
-export function extractSections(props: Record<string, unknown>): JsonSections {
-  const { idle_timeout, parameters, llm, tts, asr, turn_detection, advanced_features } = props
-  const paramsWithIdle = { idle_timeout, ...(parameters as Record<string, unknown> ?? {}) }
-  return {
-    llm:               JSON.stringify(llm ?? {}, null, 2),
-    tts:               JSON.stringify(tts ?? {}, null, 2),
-    asr:               JSON.stringify(asr ?? {}, null, 2),
-    parameters:        JSON.stringify(paramsWithIdle, null, 2),
-    turn_detection:    JSON.stringify(turn_detection ?? {}, null, 2),
-    advanced_features: JSON.stringify(advanced_features ?? {}, null, 2),
-  }
-}
-
-export function sectionsToProps(sections: JsonSections, original: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...original }
-  const { idle_timeout, ...restParams } = JSON.parse(sections.parameters) as Record<string, unknown>
-  result.llm               = JSON.parse(sections.llm)
-  result.tts               = JSON.parse(sections.tts)
-  result.asr               = JSON.parse(sections.asr)
-  result.parameters        = restParams
-  result.idle_timeout      = idle_timeout
-  result.turn_detection    = JSON.parse(sections.turn_detection)
-  result.advanced_features = JSON.parse(sections.advanced_features)
-  return result
-}
 
 // ── UI primitives ─────────────────────────────────────────────────
 function Modal({ title, onClose, children, wide = false }: {
@@ -91,130 +42,6 @@ function Modal({ title, onClose, children, wide = false }: {
   )
 }
 
-// ── JSON Properties Editor ────────────────────────────────────────
-export function JsonPropsEditor({
-  sections,
-  errors,
-  onChange,
-}: {
-  sections: JsonSections
-  errors: JsonSectionErrors
-  onChange: (key: SectionKey, value: string) => void
-}) {
-  const [open, setOpen] = useState<Record<SectionKey, boolean>>({
-    llm: true, tts: true, asr: false, parameters: false, turn_detection: false, advanced_features: false,
-  })
-  const toggle = (k: SectionKey) => setOpen(o => ({ ...o, [k]: !o[k] }))
-
-  return (
-    <div className="space-y-3">
-      {SECTIONS.map(({ key, label, border, rows }) => (
-        <div key={key} className={cn('rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden border-l-4', border)}>
-          <button
-            type="button"
-            onClick={() => toggle(key)}
-            className="w-full flex items-center justify-between px-3.5 py-3 text-left hover:bg-gray-50 transition-colors"
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-900">{label}</span>
-              {errors[key] && (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-red-50 text-red-600 border border-red-200">
-                  Invalid JSON
-                </span>
-              )}
-            </div>
-            {open[key]
-              ? <ChevronDown size={16} className="text-gray-400 shrink-0" />
-              : <ChevronRight size={16} className="text-gray-400 shrink-0" />}
-          </button>
-          {open[key] && (
-            <div className="px-3.5 pb-3.5 border-t border-gray-100">
-              <textarea
-                value={sections[key]}
-                onChange={e => onChange(key, e.target.value)}
-                rows={rows}
-                spellCheck={false}
-                className={cn(
-                  'w-full mt-3 font-mono text-xs border rounded-lg px-3 py-2.5 resize-y focus:outline-none focus:ring-2 focus:border-transparent bg-gray-50 leading-relaxed',
-                  errors[key]
-                    ? 'border-red-300 focus:ring-red-500'
-                    : 'border-gray-200 focus:ring-indigo-500',
-                )}
-              />
-              {errors[key] && (
-                <p className="mt-1 text-xs text-red-600">{errors[key]}</p>
-              )}
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
-  )
-}
-
-// ── Default properties for new agent ─────────────────────────────
-const DEFAULT_PROPERTIES = {
-  llm: {
-    url: 'https://api.openai.com/v1/chat/completions',
-    api_key: '',
-    system_messages: [{ role: 'system', content: '' }],
-    max_history: 32,
-    greeting_message: '',
-    failure_message: '',
-    params: { model: 'gpt-5.4-nano' },
-  },
-  tts: {
-    vendor: 'minimax',
-    params: {
-      key: '',
-      url: 'wss://api-uw.minimax.io/ws/v1/t2a_v2',
-      model: 'speech-02-turbo',
-      group_id: '1967483817044222128',
-      voice_setting: { voice_id: 'ai_assistant_008', sample_rate: 8000 },
-      language_boost: 'Chinese',
-    },
-  },
-  asr: { vendor: 'ares', language: 'zh-CN' },
-  parameters: {
-    idle_timeout: 120,
-    transcript: { enable: true, protocol_version: 'v2', enable_words: true, redundant: false },
-    enable_dump: true,
-    data_channel: 'rtm',
-    audio_scenario: 'default',
-    enable_metrics: true,
-    silence_config: { action: 'think', content: '', timeout_ms: 4000 },
-    enable_flexible: true,
-    enable_error_message: true,
-  },
-  turn_detection: {
-    mode: 'default',
-    config: {
-      start_of_speech: {
-        mode: 'vad',
-        vad_config: { interrupt_duration_ms: 160, speaking_interrupt_duration_ms: 160, prefix_padding_ms: 800 },
-      },
-      end_of_speech: {
-        mode: 'semantic',
-        semantic_config: { silence_duration_ms: 240, max_wait_ms: 3000 },
-      },
-    },
-  },
-  advanced_features: { enable_rtm: true, enable_sal: false, enable_tools: true },
-}
-
-function makeDefaultSections(): JsonSections {
-  const { idle_timeout, parameters, ...rest } = DEFAULT_PROPERTIES as unknown as Record<string, unknown>
-  const paramsWithIdle = { idle_timeout, ...(parameters as Record<string, unknown>) }
-  return {
-    llm:               JSON.stringify(rest.llm,               null, 2),
-    tts:               JSON.stringify(rest.tts,               null, 2),
-    asr:               JSON.stringify(rest.asr,               null, 2),
-    parameters:        JSON.stringify(paramsWithIdle,          null, 2),
-    turn_detection:    JSON.stringify(rest.turn_detection,    null, 2),
-    advanced_features: JSON.stringify(rest.advanced_features, null, 2),
-  }
-}
-
 // ── Main page ─────────────────────────────────────────────────────
 export function AgentsPage() {
   const { t, i18n } = useTranslation()
@@ -226,6 +53,8 @@ export function AgentsPage() {
   const [createName, setCreateName] = useState('')
   const [createSections, setCreateSections] = useState<JsonSections>(makeDefaultSections())
   const [createSectionErrors, setCreateSectionErrors] = useState<JsonSectionErrors>({})
+  const [createMode, setCreateMode] = useState<EditorMode>('ui')
+  const [createSimple, setCreateSimple] = useState<SimpleAgentFields>(DEFAULT_SIMPLE_FIELDS)
   const [submitting, setSubmitting] = useState(false)
   const [createError, setCreateError] = useState('')
 
@@ -236,6 +65,8 @@ export function AgentsPage() {
     original: Record<string, unknown>
     sections: JsonSections
     errors: JsonSectionErrors
+    mode: EditorMode
+    simple: SimpleAgentFields
   } | null>(null)
   const [propsError, setPropsError] = useState('')
   const [updating, setUpdating] = useState(false)
@@ -396,6 +227,8 @@ export function AgentsPage() {
     setCreateName('')
     setCreateSections(makeDefaultSections())
     setCreateSectionErrors({})
+    setCreateMode('ui')
+    setCreateSimple(DEFAULT_SIMPLE_FIELDS)
     setCreateError('')
   }
 
@@ -408,17 +241,10 @@ export function AgentsPage() {
       return
     }
 
-    // Validate all JSON sections
-    const errors: JsonSectionErrors = {}
-    let hasErrors = false
-    for (const { key } of SECTIONS) {
-      try { JSON.parse(createSections[key]) } catch {
-        errors[key] = 'Invalid JSON'
-        hasErrors = true
-      }
-    }
-    if (hasErrors) {
+    const errors = validateSections(createSections)
+    if (Object.keys(errors).length > 0) {
       setCreateSectionErrors(errors)
+      setCreateMode('json')
       return
     }
 
@@ -463,7 +289,15 @@ export function AgentsPage() {
   function openPropsModal(agent: Agent) {
     setPropsError('')
     const original = (agent.properties ?? {}) as Record<string, unknown>
-    setPropsModal({ agent, original, sections: extractSections(original), errors: {} })
+    const sections = extractSections(original)
+    setPropsModal({
+      agent,
+      original,
+      sections,
+      errors: {},
+      mode: 'ui',
+      simple: extractSimpleFieldsFromProps(original),
+    })
   }
 
   // ── Update properties ────────────────────────────────────────────
@@ -471,16 +305,9 @@ export function AgentsPage() {
     if (!propsModal) return
     setPropsError('')
 
-    const errors: JsonSectionErrors = {}
-    let hasErrors = false
-    for (const { key } of SECTIONS) {
-      try { JSON.parse(propsModal.sections[key]) } catch {
-        errors[key] = 'Invalid JSON'
-        hasErrors = true
-      }
-    }
-    if (hasErrors) {
-      setPropsModal(m => m ? { ...m, errors } : null)
+    const errors = validateSections(propsModal.sections)
+    if (Object.keys(errors).length > 0) {
+      setPropsModal(m => m ? { ...m, errors, mode: 'json' } : null)
       return
     }
 
@@ -669,7 +496,7 @@ export function AgentsPage() {
         <Modal title={`Edit Properties — ${propsModal.agent.agent_name}`} onClose={() => setPropsModal(null)} wide>
           <div className="px-6 pt-3 pb-3 border-b border-gray-100 flex-shrink-0 flex items-center justify-between gap-3">
             <p className="text-xs text-gray-400">
-              {t('agents.props_sensitive_hint')}
+              {propsModal.mode === 'json' ? t('agents.props_sensitive_hint') : t('agents.props_ui_hint')}
             </p>
             <button
               onClick={handleUpdate}
@@ -685,10 +512,12 @@ export function AgentsPage() {
             {propsError && (
               <p className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{propsError}</p>
             )}
-            <JsonPropsEditor
+            <AgentPropertiesEditor
+              mode={propsModal.mode}
+              onModeChange={mode => setPropsModal(m => m ? { ...m, mode } : null)}
               sections={propsModal.sections}
               errors={propsModal.errors}
-              onChange={(key, value) => {
+              onSectionChange={(key, value) => {
                 let sectionError: string | undefined
                 try { JSON.parse(value) } catch { sectionError = 'Invalid JSON' }
                 setPropsModal(m => m ? {
@@ -697,6 +526,9 @@ export function AgentsPage() {
                   errors: { ...m.errors, [key]: sectionError },
                 } : null)
               }}
+              onReplaceSections={sections => setPropsModal(m => m ? { ...m, sections } : null)}
+              simple={propsModal.simple}
+              onSimpleChange={simple => setPropsModal(m => m ? { ...m, simple } : null)}
             />
           </div>
         </Modal>
@@ -732,15 +564,20 @@ export function AgentsPage() {
             {createError && (
               <p className="mb-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{createError}</p>
             )}
-            <JsonPropsEditor
+            <AgentPropertiesEditor
+              mode={createMode}
+              onModeChange={setCreateMode}
               sections={createSections}
               errors={createSectionErrors}
-              onChange={(key, value) => {
+              onSectionChange={(key, value) => {
                 let sectionError: string | undefined
                 try { JSON.parse(value) } catch { sectionError = 'Invalid JSON' }
                 setCreateSections(prev => ({ ...prev, [key]: value }))
                 setCreateSectionErrors(prev => ({ ...prev, [key]: sectionError }))
               }}
+              onReplaceSections={setCreateSections}
+              simple={createSimple}
+              onSimpleChange={setCreateSimple}
             />
           </div>
         </Modal>

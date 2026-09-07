@@ -35,6 +35,16 @@ class Settings(BaseSettings):
     quota_transcript_eval_poll_interval_seconds: int = 20
     quota_transcript_eval_poll_batch_limit: int = 200
 
+    # Case Study (daily call QC + prompt suggestions)
+    case_study_timezone: str = 'Asia/Shanghai'
+    case_study_run_hour: int = 2
+    case_study_min_duration_seconds: int = 30
+    case_study_quality_threshold: float = 0.8
+    case_study_min_effective_calls: int = 3
+    case_study_audio_qc_limit: int = 8
+    case_study_qc_model: str = 'openai/gpt-4o-mini'
+    case_study_audio_model: str = 'google/gemini-2.5-flash'
+
     # AWS S3 (for audio migration)
     aws_access_key_id: str = ''
     aws_secret_access_key: str = ''

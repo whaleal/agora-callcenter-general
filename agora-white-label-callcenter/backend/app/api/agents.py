@@ -235,6 +235,52 @@ class CreateAgentWithPropertiesRequest(BaseModel):
     properties: dict
 
 
+def _donor_secret(donor: dict | None, path: list[str]) -> str:
+    node: object = donor or {}
+    for key in path:
+        if not isinstance(node, dict):
+            return ''
+        node = node.get(key)
+    return node if isinstance(node, str) else ''
+
+
+async def _fill_missing_secrets(props: dict, db: AsyncSession) -> dict:
+    """UI 创建时 properties 不含密钥。优先用环境变量，否则从同环境已有 agent 复制。"""
+    llm = props.get('llm') if isinstance(props.get('llm'), dict) else None
+    tts = props.get('tts') if isinstance(props.get('tts'), dict) else None
+    tts_params = tts.get('params') if isinstance(tts, dict) and isinstance(tts.get('params'), dict) else None
+
+    need_llm_key = bool(llm) and not llm.get('api_key')
+    need_tts_key = bool(tts_params) and not tts_params.get('key')
+    donor: dict | None = None
+    if need_llm_key or need_tts_key:
+        result = await db.execute(
+            select(AgentV2).where(agent_scope_filter()).order_by(AgentV2.id.desc()).limit(30)
+        )
+        for rec in result.scalars().all():
+            if not rec.properties:
+                continue
+            try:
+                parsed = json.loads(rec.properties)
+            except Exception:
+                continue
+            if isinstance(parsed, dict):
+                donor = parsed
+                break
+
+    if llm is not None:
+        if not llm.get('api_key'):
+            llm['api_key'] = settings.effective_openai_api_key or _donor_secret(donor, ['llm', 'api_key'])
+        if not llm.get('url'):
+            llm['url'] = settings.openai_compatible_chat_completions_url
+        params = llm.get('params')
+        if isinstance(params, dict) and not params.get('model'):
+            params['model'] = settings.agent_llm_model
+    if tts_params is not None and not tts_params.get('key'):
+        tts_params['key'] = settings.minimax_api_key or _donor_secret(donor, ['tts', 'params', 'key'])
+    return props
+
+
 @router.post('/create-with-properties')
 async def create_agent_with_properties(
     body: CreateAgentWithPropertiesRequest,
@@ -243,7 +289,7 @@ async def create_agent_with_properties(
     payload = {
         'agent_name': body.agent_name,
         'agent_type': 'CALL_AGENT',
-        'properties': body.properties,
+        'properties': await _fill_missing_secrets(body.properties, db),
     }
 
     async with httpx.AsyncClient(timeout=15) as client:

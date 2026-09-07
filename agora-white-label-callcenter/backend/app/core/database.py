@@ -28,6 +28,8 @@ async def init_db() -> None:
     from app.models.quota_v2 import QuotaV2  # noqa: F401
     from app.models.calls_v2 import CallV2  # noqa: F401
     from app.models.calls_v2_sync_state import CallV2SyncState  # noqa: F401
+    from app.models.case_study import CaseStudyRun, CaseStudyFilterLog, CaseStudyCallQc  # noqa: F401
+    from app.models.voice_library import VoiceLibrary  # noqa: F401
 
     from sqlalchemy import text
 
@@ -62,3 +64,6 @@ async def init_db() -> None:
     await _ddl('ALTER TABLE campaigns_v2 ADD COLUMN IF NOT EXISTS total_numbers INTEGER')
     await _ddl('ALTER TABLE campaigns_v2 ADD COLUMN IF NOT EXISTS app_id VARCHAR(64)')
     await _ddl('ALTER TABLE phone_numbers_v2 ADD COLUMN IF NOT EXISTS app_id VARCHAR(64)')
+
+    from app.services.voice_library_seed import seed_voice_library
+    await seed_voice_library()

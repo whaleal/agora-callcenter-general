@@ -22,6 +22,7 @@ import { CallHistoryPage } from './pages/call-history/CallHistoryPage'
 import { InboundRoutingPage } from './pages/inbound-routing/InboundRoutingPage'
 import { AnalyticsDashboard } from './pages/analytics/AnalyticsDashboard'
 import { ImportPage } from './pages/import/ImportPage'
+import { CaseStudyPage } from './pages/case-study/CaseStudyPage'
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
           <Route path="phone-numbers" element={<PhoneNumbersPage />} />
           <Route path="agents" element={<AgentsPage />} />
           <Route path="call-history" element={<CallHistoryPage />} />
+          <Route path="case-study" element={<CaseStudyPage />} />
           <Route path="inbound-routing" element={<InboundRoutingPage />} />
           <Route path="dashboard" element={<AnalyticsDashboard />} />
           <Route path="surveys" element={<SurveyListPage />} />
