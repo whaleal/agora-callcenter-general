@@ -19,6 +19,9 @@ ENV/
 backend/dev.db
 backend/*.db
 
+# Auto-generated JWT HMAC key (do not commit)
+backend/data/jwt_hmac.key
+
 # Environment variables
 backend/.env
 backend/.env.md

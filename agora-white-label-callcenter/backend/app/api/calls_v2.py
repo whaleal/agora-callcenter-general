@@ -265,6 +265,9 @@ async def merge_upstream_call_details(db: AsyncSession, call_ids: list[str]) -> 
         _merge_upstream_detail_into_row(row, d)
         n += 1
     await db.commit()
+    if rows_map:
+        from app.services.call_usage import upsert_call_usage
+        await upsert_call_usage(db, list(rows_map.values()))
     return n
 
 
@@ -584,6 +587,8 @@ async def sync_calls_v2_upstream(db: AsyncSession, campaign_id: str) -> dict:
     if changed_ids:
         result = await db.execute(select(CallV2).where(CallV2.call_id.in_(changed_ids)))
         rows = result.scalars().all()
+        from app.services.call_usage import upsert_call_usage
+        await upsert_call_usage(db, rows)
     return {
         'campaign_id': campaign_id,
         'count': len(rows),

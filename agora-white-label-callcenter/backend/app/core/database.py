@@ -30,6 +30,9 @@ async def init_db() -> None:
     from app.models.calls_v2_sync_state import CallV2SyncState  # noqa: F401
     from app.models.case_study import CaseStudyRun, CaseStudyFilterLog, CaseStudyCallQc  # noqa: F401
     from app.models.voice_library import VoiceLibrary  # noqa: F401
+    from app.models.user import EmailVerificationCode, User  # noqa: F401
+    from app.models.operation_log import OperationLog  # noqa: F401
+    from app.models.call_usage import CallUsage  # noqa: F401
 
     from sqlalchemy import text
 

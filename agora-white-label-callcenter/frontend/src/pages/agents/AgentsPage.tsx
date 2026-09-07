@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -95,7 +96,7 @@ export function AgentsPage() {
     const ch = `live-${Math.random().toString(36).slice(2, 10)}`
 
     try {
-      const tokenResp = await fetch(`${API}/api/live-test/token`, {
+      const tokenResp = await authFetch(`${API}/api/live-test/token`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ uid: USER_UID, channel: ch }),
@@ -133,7 +134,7 @@ export function AgentsPage() {
       await rtmClient.login({ token: rtmToken })
       await rtmClient.subscribe(ch, { withPresence: false, withMessage: true, beQuiet: true })
 
-      const startResp = await fetch(`${API}/api/live-test/start`, {
+      const startResp = await authFetch(`${API}/api/live-test/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: agent.agent_id, channel: ch, user_uid: USER_UID }),
@@ -174,7 +175,7 @@ export function AgentsPage() {
     setLiveStatus('stopping')
     try {
       if (sessionAgentIdRef.current) {
-        await fetch(`${API}/api/live-test/stop`, {
+        await authFetch(`${API}/api/live-test/stop`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ session_agent_id: sessionAgentIdRef.current }),
@@ -208,10 +209,10 @@ export function AgentsPage() {
 
   async function loadAgents() {
     try {
-      const dbData = await fetch(`${API}/api/agents`).then(r => r.json())
+      const dbData = await authFetch(`${API}/api/agents`).then(r => r.json())
       setAgents(dbData)
       setLoading(false)
-      const synced = await fetch(`${API}/api/agents/sync`, { method: 'POST' }).then(r => r.json())
+      const synced = await authFetch(`${API}/api/agents/sync`, { method: 'POST' }).then(r => r.json())
       setAgents(synced)
     } catch {
       setError(t('agents.server_error'))
@@ -251,7 +252,7 @@ export function AgentsPage() {
     const properties = sectionsToProps(createSections, {})
     setSubmitting(true)
     try {
-      const resp = await fetch(`${API}/api/agents/create-with-properties`, {
+      const resp = await authFetch(`${API}/api/agents/create-with-properties`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_name: createName.trim(), properties }),
@@ -275,7 +276,7 @@ export function AgentsPage() {
     if (!confirm(t('agents.delete_confirm'))) return
     setDeletingId(agentId)
     try {
-      const resp = await fetch(`${API}/api/agents/${agentId}`, { method: 'DELETE' })
+      const resp = await authFetch(`${API}/api/agents/${agentId}`, { method: 'DELETE' })
       if (!resp.ok) throw new Error()
       setAgents(prev => prev.filter(a => a.agent_id !== agentId))
     } catch {
@@ -314,7 +315,7 @@ export function AgentsPage() {
     const rebuilt = sectionsToProps(propsModal.sections, propsModal.original)
     setUpdating(true)
     try {
-      const resp = await fetch(`${API}/api/agents/${propsModal.agent.agent_id}/properties`, {
+      const resp = await authFetch(`${API}/api/agents/${propsModal.agent.agent_id}/properties`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(rebuilt),

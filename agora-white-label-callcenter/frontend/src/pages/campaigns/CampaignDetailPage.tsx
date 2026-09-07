@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect, useRef, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
@@ -266,7 +267,7 @@ export function CampaignDetailPage() {
 
   useEffect(() => {
     if (!id) return
-    fetch(`${API}/api/campaigns-v2/${id}`)
+    authFetch(`${API}/api/campaigns-v2/${id}`)
       .then(r => r.json())
       .then(data => {
         setCampaign(data)
@@ -283,7 +284,7 @@ export function CampaignDetailPage() {
 
   async function fetchCallsPage() {
     if (!id) throw new Error(t('agora.load_calls_fail'))
-    const dbResp = await fetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
+    const dbResp = await authFetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
     if (!dbResp.ok) {
       const errText = await dbResp.text()
       throw new Error(errText || t('agora.load_calls_fail'))
@@ -302,10 +303,10 @@ export function CampaignDetailPage() {
       await fetchCallsPage()
       if (preferDbOnly) return
 
-      const syncResp = await fetch(`${API}/api/calls-v2/${id}/sync`, { method: 'POST' })
+      const syncResp = await authFetch(`${API}/api/calls-v2/${id}/sync`, { method: 'POST' })
       if (syncResp.ok) {
         await syncResp.json()
-        const refreshed = await fetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
+        const refreshed = await authFetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
         if (refreshed.ok) {
           const refreshedBody = await refreshed.json()
           applyCallsListPayload(refreshedBody as { items?: CallV2ListItem[]; total?: number; stats?: CallV2Stats })
@@ -343,10 +344,10 @@ export function CampaignDetailPage() {
       }
       setCallsLoading(true)
       try {
-        const syncResp = await fetch(`${API}/api/calls-v2/${id}/sync`, { method: 'POST' })
+        const syncResp = await authFetch(`${API}/api/calls-v2/${id}/sync`, { method: 'POST' })
         if (syncResp.ok) {
           await syncResp.json()
-          const refreshed = await fetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
+          const refreshed = await authFetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
           if (refreshed.ok) {
             const refreshedBody = await refreshed.json()
             if (!cancelled) {
@@ -382,7 +383,7 @@ export function CampaignDetailPage() {
           (st === 'running' || st === 'scheduled') &&
           now - lastCampaignUpstreamAtRef.current >= UPSTREAM_COOLDOWN_MS
         const q = useUpstream ? '?refresh_from_upstream=true' : ''
-        const r = await fetch(`${API}/api/campaigns-v2/${id}${q}`)
+        const r = await authFetch(`${API}/api/campaigns-v2/${id}${q}`)
         if (!r.ok) return
         const data = await r.json()
         if (useUpstream) {
@@ -411,10 +412,10 @@ export function CampaignDetailPage() {
       if (callsSyncingRef.current) return
       callsSyncingRef.current = true
       try {
-        const resp = await fetch(`${API}/api/calls-v2/${id}/sync`, { method: 'POST' })
+        const resp = await authFetch(`${API}/api/calls-v2/${id}/sync`, { method: 'POST' })
         if (resp.ok) {
           await resp.json()
-          const refreshed = await fetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
+          const refreshed = await authFetch(`${API}/api/calls-v2/${id}?${callListQueryString()}`)
           if (refreshed.ok) {
             const refreshedBody = await refreshed.json()
             applyCallsListPayload(refreshedBody as { items?: CallV2ListItem[]; total?: number; stats?: CallV2Stats })
@@ -434,7 +435,7 @@ export function CampaignDetailPage() {
     if (!id || !campaign) return
     setInterrupting(true)
     try {
-      const resp = await fetch(`${API}/api/campaigns-v2/${id}/interrupt`, { method: 'POST' })
+      const resp = await authFetch(`${API}/api/campaigns-v2/${id}/interrupt`, { method: 'POST' })
       if (!resp.ok) throw new Error()
       setCampaign(prev => prev ? { ...prev, status: 'interrupted' } : prev)
       statusRef.current = 'interrupted'
@@ -896,7 +897,7 @@ export function CampaignDetailPage() {
                           onClick={async () => {
                             if (!c.has_transcript) return
                             try {
-                              const r = await fetch(`${API}/api/calls-v2/call/${c.call_id}`)
+                              const r = await authFetch(`${API}/api/calls-v2/call/${c.call_id}`)
                               if (!r.ok) return
                               setActiveTranscript((await r.json()) as CallV2Detail)
                             } catch { /* ignore */ }
@@ -921,7 +922,7 @@ export function CampaignDetailPage() {
                           onClick={async () => {
                             if (!c.has_structured_output) return
                             try {
-                              const r = await fetch(`${API}/api/calls-v2/call/${c.call_id}`)
+                              const r = await authFetch(`${API}/api/calls-v2/call/${c.call_id}`)
                               if (!r.ok) return
                               setActiveStructured((await r.json()) as CallV2Detail)
                             } catch { /* ignore */ }
@@ -948,7 +949,7 @@ export function CampaignDetailPage() {
                             let url = c.record_file_url
                             if (url.startsWith('s3://')) {
                               try {
-                                const r = await fetch(`${API}/api/import/audio-presign`, {
+                                const r = await authFetch(`${API}/api/import/audio-presign`, {
                                   method: 'POST',
                                   headers: { 'Content-Type': 'application/json' },
                                   body: JSON.stringify({ s3_uri: url }),

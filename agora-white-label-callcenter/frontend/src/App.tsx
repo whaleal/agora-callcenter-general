@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/Layout'
 import { LoginPage } from './pages/auth/LoginPage'
+import { RegisterPage } from './pages/auth/RegisterPage'
 import { isAuthenticated } from './lib/auth'
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -23,12 +24,14 @@ import { InboundRoutingPage } from './pages/inbound-routing/InboundRoutingPage'
 import { AnalyticsDashboard } from './pages/analytics/AnalyticsDashboard'
 import { ImportPage } from './pages/import/ImportPage'
 import { CaseStudyPage } from './pages/case-study/CaseStudyPage'
+import { LoginLogsPage } from './pages/operation-logs/LoginLogsPage'
 
 export default function App() {
   return (
     <BrowserRouter basename={import.meta.env.BASE_URL}>
       <Routes>
         <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="campaigns" element={<CampaignsPage />} />
@@ -48,6 +51,7 @@ export default function App() {
           <Route path="surveys/:id/dashboard" element={<DashboardPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="import" element={<ImportPage />} />
+          <Route path="login-logs" element={<LoginLogsPage />} />
         </Route>
       </Routes>
     </BrowserRouter>

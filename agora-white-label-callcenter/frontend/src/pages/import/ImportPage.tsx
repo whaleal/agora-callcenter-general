@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useRef, useEffect } from 'react'
 import { Upload, CloudUpload, Play, Square, RefreshCw, CheckCircle2, XCircle, Loader2, FileText, Trash2 } from 'lucide-react'
 import { cn } from '../../lib/utils'
@@ -43,7 +44,7 @@ export function ImportPage() {
     if (mig.status === 'running') {
       pollRef.current = setInterval(async () => {
         try {
-          const s: MigStatus = await fetch(`${API}/api/import/migrate-audio/status`).then(r => r.json())
+          const s: MigStatus = await authFetch(`${API}/api/import/migrate-audio/status`).then(r => r.json())
           setMig(s)
           if (s.status !== 'running') clearInterval(pollRef.current!)
         } catch { /* ignore */ }
@@ -56,7 +57,7 @@ export function ImportPage() {
 
   // fetch initial migration status on mount
   useEffect(() => {
-    fetch(`${API}/api/import/migrate-audio/status`)
+    authFetch(`${API}/api/import/migrate-audio/status`)
       .then(r => r.json())
       .then((s: MigStatus) => setMig(s))
       .catch(() => {})
@@ -85,7 +86,7 @@ export function ImportPage() {
     try {
       const fd = new FormData()
       fd.append('file', csvFile)
-      const resp = await fetch(`${API}/api/import/campaign-csv`, { method: 'POST', body: fd })
+      const resp = await authFetch(`${API}/api/import/campaign-csv`, { method: 'POST', body: fd })
       if (!resp.ok) {
         const contentType = resp.headers.get('content-type') ?? ''
         if (contentType.includes('application/json')) {
@@ -108,7 +109,7 @@ export function ImportPage() {
   async function startMigration() {
     setMigLoading(true)
     try {
-      const s: MigStatus = await fetch(`${API}/api/import/migrate-audio/start`, { method: 'POST' }).then(r => r.json())
+      const s: MigStatus = await authFetch(`${API}/api/import/migrate-audio/start`, { method: 'POST' }).then(r => r.json())
       setMig(s)
     } catch { /* ignore */ } finally {
       setMigLoading(false)
@@ -118,7 +119,7 @@ export function ImportPage() {
   async function stopMigration() {
     setMigLoading(true)
     try {
-      const s: MigStatus = await fetch(`${API}/api/import/migrate-audio/stop`, { method: 'POST' }).then(r => r.json())
+      const s: MigStatus = await authFetch(`${API}/api/import/migrate-audio/stop`, { method: 'POST' }).then(r => r.json())
       setMig(s)
     } catch { /* ignore */ } finally {
       setMigLoading(false)
@@ -127,7 +128,7 @@ export function ImportPage() {
 
   async function refreshStatus() {
     try {
-      const s: MigStatus = await fetch(`${API}/api/import/migrate-audio/status`).then(r => r.json())
+      const s: MigStatus = await authFetch(`${API}/api/import/migrate-audio/status`).then(r => r.json())
       setMig(s)
     } catch { /* ignore */ }
   }

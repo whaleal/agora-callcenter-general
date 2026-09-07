@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect, useCallback } from 'react'
 import {
   Loader2, PhoneIncoming, Link2, Link2Off, Plus, Trash2, X, ChevronDown, ChevronUp,
@@ -192,8 +193,8 @@ export function InboundRoutingPage() {
     setError('')
     try {
       const [routingData, agentsData] = await Promise.all([
-        fetch(`${API}/api/inbound-routing`).then(r => r.json()),
-        fetch(`${API}/api/agents`).then(r => r.json()),
+        authFetch(`${API}/api/inbound-routing`).then(r => r.json()),
+        authFetch(`${API}/api/agents`).then(r => r.json()),
       ])
       setEntries(Array.isArray(routingData) ? routingData : [])
       setAgents(Array.isArray(agentsData) ? agentsData : [])
@@ -220,7 +221,7 @@ export function InboundRoutingPage() {
     setFormError('')
     setSubmitting(true)
     try {
-      const resp = await fetch(`${API}/api/inbound-routing/${modalEntry.number_id}/bind`, {
+      const resp = await authFetch(`${API}/api/inbound-routing/${modalEntry.number_id}/bind`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form),
@@ -243,7 +244,7 @@ export function InboundRoutingPage() {
     if (!confirm('Remove agent binding from this phone number?')) return
     setUnbindingId(numberId)
     try {
-      const resp = await fetch(`${API}/api/inbound-routing/${numberId}/bind`, { method: 'DELETE' })
+      const resp = await authFetch(`${API}/api/inbound-routing/${numberId}/bind`, { method: 'DELETE' })
       if (!resp.ok) throw new Error()
       setEntries(prev => prev.map(e =>
         e.number_id === numberId ? { ...e, binding: null } : e,

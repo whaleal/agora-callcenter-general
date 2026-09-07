@@ -1,3 +1,4 @@
+import { authFetch } from '../../lib/api'
 import { useState, useEffect } from 'react'
 import { CheckCircle2, Eye, EyeOff, Loader2 } from 'lucide-react'
 
@@ -78,7 +79,7 @@ export function SettingsPage() {
   const [error, setError] = useState('')
 
   useEffect(() => {
-    fetch(`${API}/api/settings`)
+    authFetch(`${API}/api/settings`)
       .then(r => r.json())
       .then(data => setCfg(prev => ({ ...prev, ...data })))
       .catch(() => setError('无法加载配置，请检查后端是否运行'))
@@ -93,7 +94,7 @@ export function SettingsPage() {
     setSaving(true)
     setError('')
     try {
-      const resp = await fetch(`${API}/api/settings`, {
+      const resp = await authFetch(`${API}/api/settings`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(cfg),
