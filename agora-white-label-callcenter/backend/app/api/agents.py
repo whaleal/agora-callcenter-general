@@ -12,19 +12,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.agent_v2 import AgentV2
-from app.services.env_scope import agent_scope_filter, current_app_id
+from app.services.env_scope import agent_scope_filter, current_app_id, is_admin, resource_visible
+from app.services.agora_http import agora_headers as _headers
 
 router = APIRouter(prefix='/api/agents', tags=['agents'])
 
 AGENT_BASE_URL = f'{settings.agora_conversational_base_url}/projects/{settings.agora_project_id}/agents'
-
-
-def _headers() -> dict:
-    return {
-        'Authorization': f'Basic {settings.agora_conversational_api_key}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
 
 
 _ASR_LANG_MAP: dict[str, str] = {
@@ -157,7 +150,7 @@ def _record_from_data(data: dict) -> dict:
     return {
         'agent_id': data['agent_id'],
         'agent_name': data['agent_name'],
-        'app_id': data.get('app_id') or settings.agora_project_id,
+        'app_id': current_app_id(),
         'system_content': system_content,
         'greeting_message': llm.get('greeting_message'),
         'failure_message': llm.get('failure_message'),
@@ -382,34 +375,40 @@ async def sync_agents(db: AsyncSession = Depends(get_db)):
     # ── Step 4: 写入 / 更新数据库 ─────────────────────────────────
     for aid in agora_ids:
         detail = detail_map.get(aid)
-        if aid not in existing_records:
+        rec = existing_records.get(aid)
+        if rec is None:
+            if not is_admin():
+                continue
             source = detail or next((i for i in agora_items if i.get('agent_id') == aid), {})
             if source:
-                stmt = pg_insert(AgentV2).values(**_record_from_data(source))
+                fields = _record_from_data(source)
+                fields['app_id'] = current_app_id()
+                stmt = pg_insert(AgentV2).values(**fields)
                 stmt = stmt.on_conflict_do_update(
                     index_elements=['agent_id'],
                     set_={k: stmt.excluded[k] for k in (
-                        'agent_name', 'app_id', 'system_content', 'greeting_message',
+                        'agent_name', 'system_content', 'greeting_message',
                         'failure_message', 'voice_id', 'properties', 'updated_at',
                     )},
                 )
                 await db.execute(stmt)
-        elif detail:
-            rec = existing_records[aid]
+            continue
+
+        if rec.app_id and rec.app_id != current_app_id() and not is_admin():
+            continue
+        if detail:
             fields = _record_from_data(detail)
             rec.agent_name = fields.get('agent_name') or rec.agent_name
-            rec.app_id = fields.get('app_id') or current_app_id()
+            if not rec.app_id:
+                rec.app_id = current_app_id()
             rec.system_content = fields['system_content']
             rec.greeting_message = fields['greeting_message']
             rec.failure_message = fields['failure_message']
             rec.voice_id = fields['voice_id']
             rec.properties = fields['properties']
             rec.updated_at = fields['updated_at']
-        else:
-            # 列表已有、无需详情：仍补齐本环境 app_id
-            rec = existing_records[aid]
-            if rec.app_id != current_app_id():
-                rec.app_id = current_app_id()
+        elif not rec.app_id:
+            rec.app_id = current_app_id()
 
     await db.commit()
 
@@ -488,7 +487,7 @@ async def update_agent_properties(
 ):
     result = await db.execute(select(AgentV2).where(AgentV2.agent_id == agent_id))
     record = result.scalar_one_or_none()
-    if not record or record.app_id != current_app_id():
+    if not record or not resource_visible(record.app_id):
         raise HTTPException(status_code=404, detail='Agent not found')
 
     original_props = json.loads(record.properties) if record.properties else {}
@@ -526,16 +525,13 @@ async def update_agent_properties(
 async def delete_agent(agent_id: str, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AgentV2).where(AgentV2.agent_id == agent_id))
     record = result.scalar_one_or_none()
-    if not record or record.app_id != current_app_id():
+    if not record or not resource_visible(record.app_id):
         raise HTTPException(status_code=404, detail='Agent not found')
 
     async with httpx.AsyncClient(timeout=15) as client:
         agora_resp = await client.delete(
             f'{AGENT_BASE_URL}/{agent_id}',
-            headers={
-                'Authorization': f'Basic {settings.agora_conversational_api_key}',
-                'Accept': 'application/json',
-            },
+            headers=_headers(),
         )
     if agora_resp.status_code not in (200, 204, 404):
         raise HTTPException(

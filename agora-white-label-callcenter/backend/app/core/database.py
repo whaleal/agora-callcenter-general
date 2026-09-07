@@ -67,6 +67,11 @@ async def init_db() -> None:
     await _ddl('ALTER TABLE campaigns_v2 ADD COLUMN IF NOT EXISTS total_numbers INTEGER')
     await _ddl('ALTER TABLE campaigns_v2 ADD COLUMN IF NOT EXISTS app_id VARCHAR(64)')
     await _ddl('ALTER TABLE phone_numbers_v2 ADD COLUMN IF NOT EXISTS app_id VARCHAR(64)')
+    await _ddl("ALTER TABLE users ADD COLUMN IF NOT EXISTS role VARCHAR(16) NOT NULL DEFAULT 'user'")
+    await _ddl('ALTER TABLE operation_logs ADD COLUMN IF NOT EXISTS user_id INTEGER')
+    await _ddl('ALTER TABLE operation_logs ADD COLUMN IF NOT EXISTS app_id VARCHAR(64)')
+    await _ddl('ALTER TABLE operation_logs ALTER COLUMN action TYPE VARCHAR(64)')
+    await _ddl("ALTER TABLE call_usage ADD COLUMN IF NOT EXISTS direction VARCHAR(16) NOT NULL DEFAULT 'outbound'")
 
     from app.services.voice_library_seed import seed_voice_library
     await seed_voice_library()

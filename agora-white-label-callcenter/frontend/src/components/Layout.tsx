@@ -46,7 +46,7 @@ export function Layout() {
     { to: '/agents',          label: t('app_nav.agents'),          icon: Bot },
     { to: '/call-history',    label: t('app_nav.call_history'),    icon: History },
     { to: '/case-study',      label: t('app_nav.case_study'),      icon: BookOpen },
-    { to: '/login-logs',      label: t('app_nav.login_logs'),      icon: ScrollText },
+    { to: '/operation-logs',  label: t('app_nav.operation_logs'),  icon: ScrollText },
     ...(importUnlocked ? [{ to: '/import', label: t('app_nav.import'), icon: FolderInput }] : []),
   ]
 

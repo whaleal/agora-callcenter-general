@@ -24,7 +24,7 @@ import { InboundRoutingPage } from './pages/inbound-routing/InboundRoutingPage'
 import { AnalyticsDashboard } from './pages/analytics/AnalyticsDashboard'
 import { ImportPage } from './pages/import/ImportPage'
 import { CaseStudyPage } from './pages/case-study/CaseStudyPage'
-import { LoginLogsPage } from './pages/operation-logs/LoginLogsPage'
+import { OperationLogsPage } from './pages/operation-logs/LoginLogsPage'
 
 export default function App() {
   return (
@@ -51,7 +51,8 @@ export default function App() {
           <Route path="surveys/:id/dashboard" element={<DashboardPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="import" element={<ImportPage />} />
-          <Route path="login-logs" element={<LoginLogsPage />} />
+          <Route path="operation-logs" element={<OperationLogsPage />} />
+          <Route path="login-logs" element={<Navigate to="/operation-logs" replace />} />
         </Route>
       </Routes>
     </BrowserRouter>

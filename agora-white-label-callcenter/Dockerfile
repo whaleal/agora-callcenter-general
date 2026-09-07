@@ -5,12 +5,27 @@ COPY frontend/package*.json ./
 RUN npm ci --legacy-peer-deps
 COPY frontend/ .
 ARG APP_VITE_BASE_PATH=/
+# 生产走同域 nginx 反代（/callcenter/api），不要把本机 VITE_API_URL=http://localhost:8000 打进包
+RUN rm -f .env .env.local .env.development .env.production
 RUN npx vite build --base="${APP_VITE_BASE_PATH}"
 
 # ── Stage 2: Runtime (Python + nginx) ────────────────────────────────────────
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
-RUN apt-get update && apt-get install -y --no-install-recommends nginx && rm -rf /var/lib/apt/lists/*
+ENV DEBIAN_FRONTEND=noninteractive
+# 只用 Debian 官方源；502 等瞬时失败时重试（Docker 交叉编译不一定走本机 VPN）
+RUN set -eux; \
+    printf 'Acquire::Retries "5";\nAcquire::http::Timeout "30";\nAcquire::https::Timeout "30";\n' \
+      > /etc/apt/apt.conf.d/80-retries; \
+    n=0; \
+    until apt-get update \
+      && apt-get install -y --no-install-recommends --fix-missing nginx ca-certificates; do \
+      n=$((n + 1)); \
+      if [ "$n" -ge 5 ]; then exit 1; fi; \
+      echo "apt failed (official Debian), retry ${n}/5 in 8s"; \
+      sleep 8; \
+    done; \
+    rm -rf /var/lib/apt/lists/*
 
 # Python backend
 WORKDIR /app/backend

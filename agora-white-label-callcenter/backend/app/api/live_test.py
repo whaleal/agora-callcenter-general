@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.database import get_db
 from app.models.agent_v2 import AgentV2
+from app.services.env_scope import agent_belongs_to_env
+from app.services.agora_http import agora_headers as _headers
 
 router = APIRouter(prefix='/api/live-test', tags=['live-test'])
 
@@ -52,14 +54,6 @@ def _session_leave_url(session_agent_id: str) -> str:
     )
 
 
-def _headers() -> dict:
-    return {
-        'Authorization': f'Basic {settings.agora_conversational_api_key}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
-
-
 # ── Models ────────────────────────────────────────────────────────────────────
 
 class TokenRequest(BaseModel):
@@ -89,7 +83,7 @@ async def get_token(body: TokenRequest):
 async def start_live_test(body: StartRequest, db: AsyncSession = Depends(get_db)):
     result = await db.execute(select(AgentV2).where(AgentV2.agent_id == body.agent_id))
     agent = result.scalar_one_or_none()
-    if not agent:
+    if not agent or not await agent_belongs_to_env(db, body.agent_id):
         raise HTTPException(status_code=404, detail='Agent not found')
 
     stored_props: dict = json.loads(agent.properties) if agent.properties else {}

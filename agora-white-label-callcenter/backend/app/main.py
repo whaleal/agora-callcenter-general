@@ -8,6 +8,7 @@ from fastapi.openapi.utils import get_openapi
 from app.core.auth_middleware import AuthMiddleware
 from app.core.config import settings
 from app.core.database import init_db
+from app.services.bootstrap_admin import ensure_admin_user
 from app.core.operation_log_middleware import OperationLogMiddleware
 from app.api import auth, websocket, settings_api, phone_numbers, agents, campaigns_v2, quota_v2, calls_v2, agora_campaigns, inbound_routing, dashboard, live_test, import_csv, case_study, voices, usage, operation_logs
 from app.services.calls_structured_output_poll import start_structured_output_poll
@@ -21,6 +22,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await ensure_admin_user()
     if settings.smtp_enabled:
         logger.info(
             'SMTP enabled: %s:%s ssl=%s from=%s',

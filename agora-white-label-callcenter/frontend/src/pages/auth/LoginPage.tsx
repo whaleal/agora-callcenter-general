@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { Loader2, Eye, EyeOff, ChevronDown } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { login, requestVerificationCode } from '../../lib/auth'
+import { login, adminLogin, requestVerificationCode } from '../../lib/auth'
 import { isValidEmail } from '../../lib/utils'
 import { LANGUAGES, setLang, type Lang } from '../../i18n'
 import agoraLogo from '../../assets/logo.png'
@@ -14,8 +14,10 @@ export function LoginPage() {
   const navigate = useNavigate()
   const { t, i18n } = useTranslation()
   const [email, setEmail] = useState('')
+  const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
   const [code, setCode] = useState('')
+  const [adminMode, setAdminMode] = useState(false)
   const [showPw, setShowPw] = useState(false)
   const [error, setError] = useState('')
   const [emailTouched, setEmailTouched] = useState(false)
@@ -67,14 +69,24 @@ export function LoginPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError('')
-    setEmailTouched(true)
-    if (!isValidEmail(email.trim())) {
-      setError(t('login.email_invalid'))
-      return
-    }
     setLoading(true)
     try {
-      await login(email.trim(), password, code.trim())
+      if (adminMode) {
+        if (!username.trim() || !password) {
+          setError(t('login.admin_required'))
+          setLoading(false)
+          return
+        }
+        await adminLogin(username.trim(), password)
+      } else {
+        setEmailTouched(true)
+        if (!isValidEmail(email.trim())) {
+          setError(t('login.email_invalid'))
+          setLoading(false)
+          return
+        }
+        await login(email.trim(), password, code.trim())
+      }
       navigate('/dashboard', { replace: true })
     } catch (err) {
       setError(err instanceof Error ? err.message : t('login.error'))
@@ -126,10 +138,28 @@ export function LoginPage() {
         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-8">
           <div className="flex flex-col items-center">
             <img src={agoraLogo} alt="Jinmu Info" className="h-12 w-auto object-contain mb-3" />
-            <h1 className="text-2xl font-semibold text-gray-900 mb-6">{t('login.title')}</h1>
+            <h1 className="text-2xl font-semibold text-gray-900 mb-6">
+              {adminMode ? t('login.admin_title') : t('login.title')}
+            </h1>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
+            {adminMode ? (
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  {t('login.username')}
+                </label>
+                <input
+                  type="text"
+                  value={username}
+                  onChange={e => setUsername(e.target.value)}
+                  placeholder={t('login.username_ph')}
+                  autoComplete="username"
+                  autoFocus
+                  className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white transition-shadow"
+                />
+              </div>
+            ) : (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 {t('login.email')}
@@ -151,6 +181,7 @@ export function LoginPage() {
                 <p className="mt-1 text-xs text-red-600">{t('login.email_invalid')}</p>
               )}
             </div>
+            )}
 
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
@@ -175,6 +206,7 @@ export function LoginPage() {
               </div>
             </div>
 
+            {!adminMode && (
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 {t('login.code')}
@@ -204,6 +236,7 @@ export function LoginPage() {
                 </button>
               </div>
             </div>
+            )}
 
             {error && (
               <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
@@ -213,7 +246,7 @@ export function LoginPage() {
 
             <button
               type="submit"
-              disabled={loading || !email || !password || !code || !isValidEmail(email.trim())}
+              disabled={loading || (adminMode ? !username.trim() || !password : !email || !password || !code || !isValidEmail(email.trim()))}
               className="w-full flex items-center justify-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-300 text-white rounded-lg py-2.5 text-sm font-medium transition-colors"
             >
               {loading && <Loader2 size={15} className="animate-spin" />}
@@ -221,10 +254,30 @@ export function LoginPage() {
             </button>
 
             <p className="text-center text-sm text-gray-500">
-              {t('login.no_account')}{' '}
-              <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
-                {t('login.sign_up')}
-              </Link>
+              {adminMode ? (
+                <button
+                  type="button"
+                  onClick={() => { setAdminMode(false); setError('') }}
+                  className="text-indigo-600 hover:text-indigo-700 font-medium"
+                >
+                  {t('login.back_to_email')}
+                </button>
+              ) : (
+                <>
+                  {t('login.no_account')}{' '}
+                  <Link to="/register" className="text-indigo-600 hover:text-indigo-700 font-medium">
+                    {t('login.sign_up')}
+                  </Link>
+                  <span className="mx-2 text-gray-300">|</span>
+                  <button
+                    type="button"
+                    onClick={() => { setAdminMode(true); setError('') }}
+                    className="text-indigo-600 hover:text-indigo-700 font-medium"
+                  >
+                    {t('login.admin_entry')}
+                  </button>
+                </>
+              )}
             </p>
           </form>
         </div>

@@ -22,6 +22,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.quota_v2 import QuotaV2
 from app.services import quota_agent_notifier, quota_transcript_eval
+from app.services.env_scope import require_campaign_in_scope
 
 router = APIRouter(prefix='/api/quota-v2', tags=['quota-v2'])
 
@@ -85,6 +86,7 @@ async def bulk_create_cells(
     db: AsyncSession = Depends(get_db),
 ):
     """Replace all quota cells for a campaign (delete existing, insert new)."""
+    await require_campaign_in_scope(db, campaign_id)
     await db.execute(delete(QuotaV2).where(QuotaV2.campaign_id == campaign_id))
 
     rows = [
@@ -110,6 +112,7 @@ async def list_cells(
     campaign_id: str,
     db: AsyncSession = Depends(get_db),
 ):
+    await require_campaign_in_scope(db, campaign_id)
     result = await db.execute(
         select(QuotaV2)
         .where(QuotaV2.campaign_id == campaign_id)
@@ -129,6 +132,7 @@ async def record_hit(
     Given a call result dict, find all quota cells whose filters match and
     increment their completed count by 1. Returns the updated cells.
     """
+    await require_campaign_in_scope(db, campaign_id)
     result = await db.execute(
         select(QuotaV2).where(QuotaV2.campaign_id == campaign_id)
     )
@@ -162,6 +166,7 @@ async def delete_cells(
     campaign_id: str,
     db: AsyncSession = Depends(get_db),
 ):
+    await require_campaign_in_scope(db, campaign_id)
     await db.execute(delete(QuotaV2).where(QuotaV2.campaign_id == campaign_id))
     await db.commit()
 
@@ -183,6 +188,7 @@ async def eval_transcript_quota(
     """
     if not settings.effective_openai_api_key:
         raise HTTPException(503, detail='OPENROUTER_API_KEY (or OPENAI_API_KEY) 未配置')
+    await require_campaign_in_scope(db, campaign_id)
     return await quota_transcript_eval.run_transcript_eval_for_campaign(
         db, campaign_id, limit=limit, prefetch_transcripts=prefetch,
     )

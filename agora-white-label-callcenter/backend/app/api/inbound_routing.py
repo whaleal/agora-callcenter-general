@@ -19,19 +19,13 @@ from app.services.env_scope import (
     phone_belongs,
     phone_scope_filter,
 )
+from app.services.agora_http import agora_headers as _headers
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix='/api/inbound-routing', tags=['inbound-routing'])
 
 PHONE_NUMBER_BASE_URL = f'{settings.agora_conversational_base_url}/phone-numbers'
-
-
-def _headers() -> dict:
-    return {
-        'Authorization': f'Basic {settings.agora_conversational_api_key}',
-        'Content-Type': 'application/json',
-    }
 
 
 class CallSuccessEvaluation(BaseModel):
@@ -222,11 +216,11 @@ async def bind_phone_number(number_id: str, body: BindingRequest, db: AsyncSessi
         logger.error('[inbound-routing] Agora returned error code %s: %s', code, msg)
         raise HTTPException(status_code=400, detail=f'Agora error (code={code}): {msg}')
 
-    # 成功绑定后补齐本环境 stamp
+    # 成功绑定后仅补齐尚未 stamp 的号码，不覆盖其他租户
     pn = (await db.execute(
         select(PhoneNumberV2).where(PhoneNumberV2.number_id == number_id)
     )).scalar_one_or_none()
-    if pn and pn.app_id != current_app_id():
+    if pn and not pn.app_id:
         pn.app_id = current_app_id()
         await db.commit()
 

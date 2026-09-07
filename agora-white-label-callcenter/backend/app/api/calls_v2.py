@@ -11,6 +11,8 @@ from app.core.database import get_db
 from app.models.calls_v2 import CallV2
 from app.models.calls_v2_sync_state import CallV2SyncState
 from app.models.campaign_v2 import CampaignV2
+from app.services.env_scope import call_scope_filter, require_campaign_in_scope
+from app.services.agora_http import agora_headers as _headers
 
 
 router = APIRouter(prefix='/api/calls-v2', tags=['calls-v2'])
@@ -101,14 +103,6 @@ def structured_output_json_for_storage(
     if isinstance(structured, list) and len(structured) > 0:
         return json.dumps(structured, ensure_ascii=False)
     return None
-
-
-def _headers() -> dict:
-    return {
-        'Authorization': f'Basic {settings.agora_conversational_api_key}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
 
 
 def _serialize(row: CallV2) -> dict:
@@ -389,9 +383,10 @@ async def list_all_calls(
     page_size: int = Query(50, ge=1, le=200),
 ):
     offset = (page - 1) * page_size
-    total = int((await db.execute(select(func.count(CallV2.id)))).scalar_one() or 0)
+    scope = call_scope_filter()
+    total = int((await db.execute(select(func.count(CallV2.id)).where(scope))).scalar_one() or 0)
     result = await db.execute(
-        select(CallV2).order_by(CallV2.id.desc()).offset(offset).limit(page_size)
+        select(CallV2).where(scope).order_by(CallV2.id.desc()).offset(offset).limit(page_size)
     )
     rows = result.scalars().all()
     return {
@@ -407,6 +402,7 @@ async def get_campaign_call_stats(
     campaign_id: str,
     db: AsyncSession = Depends(get_db),
 ):
+    await require_campaign_in_scope(db, campaign_id)
     row = (await db.execute(_campaign_stats_select(campaign_id))).one()
     return _stats_row_to_payload(campaign_id, row)
 
@@ -424,6 +420,7 @@ async def list_calls(
         description='If true, include aggregated stats (stats query then paginated list).',
     ),
 ):
+    await require_campaign_in_scope(db, campaign_id)
     offset = (page - 1) * page_size
     filt = _call_category_filter_expr(category)
     wheres = [CallV2.campaign_id == campaign_id]
@@ -470,7 +467,11 @@ async def list_calls(
 
 @router.get('/call/{call_id}')
 async def get_call_detail(call_id: str, db: AsyncSession = Depends(get_db)):
-    row = (await db.execute(select(CallV2).where(CallV2.call_id == call_id))).scalar_one_or_none()
+    row = (
+        await db.execute(
+            select(CallV2).where(CallV2.call_id == call_id, call_scope_filter())
+        )
+    ).scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=404, detail='Call not found')
     return _serialize(row)
@@ -602,6 +603,7 @@ async def sync_calls(
     db: AsyncSession = Depends(get_db),
     refresh: bool = Query(True, description='If true, fetch from upstream then upsert DB'),
 ):
+    await require_campaign_in_scope(db, campaign_id)
     if not refresh:
         return {'campaign_id': campaign_id, 'count': 0, 'items': []}
     return await sync_calls_v2_upstream(db, campaign_id)
@@ -610,6 +612,7 @@ async def sync_calls(
 @router.delete('/{campaign_id}/sync-state')
 async def reset_sync_state(campaign_id: str, db: AsyncSession = Depends(get_db)):
     """Clear the sync watermark so the next sync re-fetches all calls from the beginning."""
+    await require_campaign_in_scope(db, campaign_id)
     state = (await db.execute(
         select(CallV2SyncState).where(CallV2SyncState.campaign_id == campaign_id)
     )).scalar_one_or_none()

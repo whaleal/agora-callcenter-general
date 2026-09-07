@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_db
 from app.models.calls_v2 import CallV2
+from app.services.env_scope import call_scope_filter
 
 router = APIRouter(prefix='/api/dashboard', tags=['dashboard'])
 
@@ -30,7 +31,7 @@ async def dashboard_stats(db: AsyncSession = Depends(get_db)):
             CallV2.call_ts,
             CallV2.call_category,
             CallV2.duration_seconds,
-        )
+        ).where(call_scope_filter())
     )
     rows = result.all()
 

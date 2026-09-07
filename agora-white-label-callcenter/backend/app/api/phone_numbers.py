@@ -16,18 +16,13 @@ from app.services.env_scope import (
     load_local_agent_ids,
     phone_belongs,
     phone_scope_filter,
+    resource_visible,
 )
+from app.services.agora_http import agora_headers as _headers
 
 router = APIRouter(prefix='/api/phone-numbers', tags=['phone-numbers'])
 
 PHONE_NUMBER_BASE_URL = f'{settings.agora_conversational_base_url}/phone-numbers'
-
-
-def _headers() -> dict:
-    return {
-        'Authorization': f'Basic {settings.agora_conversational_api_key}',
-        'Content-Type': 'application/json',
-    }
 
 
 def _extract_list(body: dict) -> list[dict]:
@@ -245,7 +240,6 @@ async def sync_phone_numbers(db: AsyncSession = Depends(get_db)):
                     'sip_signaling_port': stmt.excluded.sip_signaling_port,
                     'outbound_protocol': stmt.excluded.outbound_protocol,
                     'updated_at': stmt.excluded.updated_at,
-                    'app_id': stmt.excluded.app_id,
                 },
             )
             await db.execute(stmt)
@@ -306,7 +300,7 @@ async def delete_phone_number(number_id: str, db: AsyncSession = Depends(get_db)
         select(PhoneNumberV2).where(PhoneNumberV2.number_id == number_id)
     )
     record = result.scalar_one_or_none()
-    if not record:
+    if not record or not resource_visible(record.app_id):
         raise HTTPException(status_code=404, detail='Phone number not found')
 
     # 调用 Agora API 删除远端记录

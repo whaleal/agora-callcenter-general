@@ -9,6 +9,7 @@ export interface AuthUser {
   email: string
   username: string
   app_id: string
+  role?: string
 }
 
 async function extractErrorMessage(resp: Response, fallback: string): Promise<string> {
@@ -56,6 +57,15 @@ export async function requestVerificationCode(email: string, type: 'register' | 
 
 export async function login(email: string, password: string, code: string): Promise<void> {
   const resp = await postJson('/api/auth/login', { email, password, code }, '登录失败')
+  await persistSession(resp)
+}
+
+export async function adminLogin(username: string, password: string): Promise<void> {
+  const resp = await postJson('/api/auth/admin-login', { username, password }, '管理员登录失败')
+  await persistSession(resp)
+}
+
+async function persistSession(resp: Response): Promise<void> {
   const data = await resp.json().catch(() => null)
   localStorage.setItem(AUTH_KEY, '1')
   if (data?.access_token) {

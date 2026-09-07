@@ -17,6 +17,7 @@ from app.core.database import AsyncSessionLocal, get_db
 from app.models.campaign_v2 import CampaignV2
 from app.models.calls_v2 import CallV2
 from app.models.call_usage import CallUsage
+from app.services.env_scope import current_app_id
 
 router = APIRouter(prefix='/api/import', tags=['import'])
 
@@ -118,7 +119,7 @@ async def import_campaign_csv(
             db.add(CampaignV2(
                 campaign_id=cdata['campaign_id'],
                 campaign_name=cdata['campaign_name'],
-                app_id=settings.agora_project_id,
+                app_id=current_app_id(),
                 agent_id=cdata['agent_id'],
                 agent_name=cdata['agent_name'],
                 phone_number=cdata['phone_number'],

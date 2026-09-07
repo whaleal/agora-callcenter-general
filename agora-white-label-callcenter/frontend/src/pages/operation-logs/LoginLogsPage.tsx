@@ -8,10 +8,12 @@ import { bcp47ForI18n } from '../../i18n'
 const API = (import.meta.env.VITE_API_URL ?? import.meta.env.BASE_URL).replace(/\/$/, '')
 const PAGE_SIZE = 50
 
-interface LoginLogItem {
+interface OperationLogItem {
   id: number
   ip: string | null
   created_at: string | null
+  method: string
+  path: string
   action: string
   status_code: number
   success: boolean
@@ -33,9 +35,9 @@ function fmtTs(ts: string | null, lng: string): string {
   return d.toLocaleString(bcp47ForI18n(lng))
 }
 
-export function LoginLogsPage() {
+export function OperationLogsPage() {
   const { t, i18n } = useTranslation()
-  const [logs, setLogs] = useState<LoginLogItem[]>([])
+  const [logs, setLogs] = useState<OperationLogItem[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
@@ -47,7 +49,7 @@ export function LoginLogsPage() {
     let cancelled = false
     setLoading(true)
     setError('')
-    authFetch(`${API}/api/operation-logs?action=login&page=${page}&page_size=${PAGE_SIZE}`)
+    authFetch(`${API}/api/operation-logs?page=${page}&page_size=${PAGE_SIZE}`)
       .then(r => {
         if (!r.ok) throw new Error(`HTTP ${r.status}`)
         return r.json()
@@ -68,17 +70,15 @@ export function LoginLogsPage() {
 
   return (
     <div className="h-full flex flex-col">
-      {/* Header */}
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-white flex-shrink-0">
         <div>
-          <h1 className="text-lg font-bold text-gray-900">{t('app_nav.login_logs')}</h1>
+          <h1 className="text-lg font-bold text-gray-900">{t('app_nav.operation_logs')}</h1>
           <p className="text-xs text-gray-400 mt-0.5">
-            {t('login_logs.subtitle', { n: total })}
+            {t('operation_logs.subtitle', { n: total })}
           </p>
         </div>
       </div>
 
-      {/* Table */}
       <div className="flex-1 overflow-auto">
         {loading ? (
           <div className="flex items-center justify-center py-32 text-gray-400">
@@ -90,17 +90,19 @@ export function LoginLogsPage() {
         ) : logs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-32 text-gray-400">
             <ScrollText size={36} className="mb-3 opacity-40" />
-            <p className="text-sm">{t('login_logs.empty')}</p>
+            <p className="text-sm">{t('operation_logs.empty')}</p>
           </div>
         ) : (
           <table className="w-full text-sm">
             <thead className="sticky top-0 bg-gray-50 border-b border-gray-100 z-10">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('login_logs.col_user')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('login_logs.col_ip')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('login_logs.col_status')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('login_logs.col_duration')}</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('login_logs.col_time')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('operation_logs.col_type')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('operation_logs.col_path')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('operation_logs.col_user')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('operation_logs.col_ip')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('operation_logs.col_status')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('operation_logs.col_duration')}</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-400 uppercase tracking-wide">{t('operation_logs.col_time')}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 bg-white">
@@ -108,13 +110,22 @@ export function LoginLogsPage() {
                 const st = statusStyle(l.success)
                 return (
                   <tr key={l.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <span className="inline-flex items-center rounded-md bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
+                        {l.action}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">
+                      <span className="text-gray-400 mr-1">{l.method}</span>
+                      {l.path}
+                    </td>
                     <td className="px-4 py-3 text-gray-900">{l.email ?? '—'}</td>
                     <td className="px-4 py-3 font-mono text-gray-400">{l.ip ?? '—'}</td>
                     <td className="px-4 py-3">
                       <span className="inline-flex items-center gap-1.5" title={l.fail_reason ?? undefined}>
                         <span className={cn('w-2 h-2 rounded-full flex-shrink-0', st.dot)} />
                         <span className={cn('text-xs font-medium', st.text)}>
-                          {l.success ? t('login_logs.status_success') : t('login_logs.status_fail')}
+                          {l.success ? t('operation_logs.status_success') : t('operation_logs.status_fail')}
                         </span>
                         {!l.success && l.fail_reason && (
                           <span className="text-xs text-gray-400 truncate max-w-[200px]">({l.fail_reason})</span>
@@ -133,11 +144,10 @@ export function LoginLogsPage() {
         )}
       </div>
 
-      {/* Pagination */}
       {!loading && !error && totalPages > 1 && (
         <div className="flex items-center justify-between px-6 py-3 border-t border-gray-100 bg-white flex-shrink-0">
           <p className="text-xs text-gray-400">
-            {t('login_logs.page_info', { page, totalPages, total })}
+            {t('operation_logs.page_info', { page, totalPages, total })}
           </p>
           <div className="flex items-center gap-1">
             <button

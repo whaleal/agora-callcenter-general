@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.agent_v2 import AgentV2
 from app.models.campaign_v2 import CampaignV2
+from app.services.agora_http import agora_headers as _headers
 
 logger = logging.getLogger(__name__)
 
@@ -46,14 +47,6 @@ def _closure_prefix(label: str, lang: str) -> str:
         f'如果当前通话中对方符合{label}条件，请告知对方：'
         f'"感谢您，您所在的{label}的调查已经结束了，下次请您继续配合。"，然后礼貌结束通话。'
     )
-
-
-def _headers() -> dict:
-    return {
-        'Authorization': f'Basic {settings.agora_conversational_api_key}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
 
 
 async def notify_quota_reached(

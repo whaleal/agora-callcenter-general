@@ -63,6 +63,9 @@ class Settings(BaseSettings):
 
     # Auth（签名密钥由 app.core.jwt_keys 首次启动时自动生成，不放配置）
     jwt_expire_minutes: int = 10080  # 7 days
+    admin_username: str = 'admin'
+    admin_email: str = 'admin@localhost'
+    admin_password: str = ''  # empty → generate a random password on first boot
     email_code_ttl_seconds: int = 600
     email_code_resend_seconds: int = 60
     operation_log_retention_days: int = 30

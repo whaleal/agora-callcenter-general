@@ -8,7 +8,7 @@ import {
   XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell,
 } from 'recharts'
-import { Loader2, PhoneCall, PhoneIncoming, Clock, RefreshCw, Radio, LayoutDashboard, PieChart as PieChartIcon, Bot, StopCircle } from 'lucide-react'
+import { Loader2, PhoneCall, PhoneIncoming, PhoneOutgoing, Clock, RefreshCw, Radio, LayoutDashboard, PieChart as PieChartIcon, Bot, StopCircle } from 'lucide-react'
 import { cn } from '../../lib/utils'
 
 const API = (import.meta.env.VITE_API_URL ?? import.meta.env.BASE_URL).replace(/\/$/, '')
@@ -39,6 +39,19 @@ interface StatsData {
   daily_stats: DailyStats[]
   category_distribution: CategoryEntry[]
   totals: Totals
+}
+
+interface DirectionUsage {
+  total_calls: number
+  answered_calls: number
+  total_duration_seconds: number
+}
+
+interface UsageData {
+  by_direction?: {
+    outbound?: DirectionUsage
+    inbound?: DirectionUsage
+  }
 }
 
 interface CampaignV2Item {
@@ -178,6 +191,7 @@ export function AnalyticsDashboard() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const [stats, setStats] = useState<StatsData | null>(null)
+  const [usage, setUsage] = useState<UsageData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [range, setRange] = useState(30)
@@ -189,17 +203,30 @@ export function AnalyticsDashboard() {
     setLoading(true)
     setError('')
     try {
-      const data: StatsData = await authFetch(`${API}/api/dashboard/stats`).then(r => {
-        if (!r.ok) throw new Error(r.statusText)
-        return r.json()
-      })
+      const params = new URLSearchParams()
+      if (range > 0) {
+        const end = new Date()
+        const start = new Date()
+        start.setDate(start.getDate() - range)
+        params.set('start_date', start.toISOString().slice(0, 10))
+        params.set('end_date', end.toISOString().slice(0, 10))
+      }
+      const qs = params.toString()
+      const [data, usageData] = await Promise.all([
+        authFetch(`${API}/api/dashboard/stats`).then(r => {
+          if (!r.ok) throw new Error(r.statusText)
+          return r.json()
+        }),
+        authFetch(`${API}/api/usage${qs ? `?${qs}` : ''}`).then(r => r.ok ? r.json() : null).catch(() => null),
+      ])
       setStats(data)
+      setUsage(usageData)
     } catch (e) {
       setError(`Failed to load data: ${e instanceof Error ? e.message : e}`)
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [range])
 
   useEffect(() => { load() }, [load])
 
@@ -340,6 +367,26 @@ export function AnalyticsDashboard() {
               sub="HH:MM:SS"
               iconBg="bg-violet-500"
             />
+          </div>
+
+          <div>
+            <h2 className="text-sm font-semibold text-gray-900 mb-3">{t('dashboard.usage_title')}</h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <StatCard
+                icon={PhoneOutgoing}
+                label={t('dashboard.usage_outbound')}
+                value={formatDuration(usage?.by_direction?.outbound?.total_duration_seconds ?? 0)}
+                sub={`${t('dashboard.usage_calls', { n: (usage?.by_direction?.outbound?.total_calls ?? 0).toLocaleString() })} · ${t('dashboard.usage_answered', { n: (usage?.by_direction?.outbound?.answered_calls ?? 0).toLocaleString() })}`}
+                iconBg="bg-sky-600"
+              />
+              <StatCard
+                icon={PhoneIncoming}
+                label={t('dashboard.usage_inbound')}
+                value={formatDuration(usage?.by_direction?.inbound?.total_duration_seconds ?? 0)}
+                sub={`${t('dashboard.usage_calls', { n: (usage?.by_direction?.inbound?.total_calls ?? 0).toLocaleString() })} · ${t('dashboard.usage_answered', { n: (usage?.by_direction?.inbound?.answered_calls ?? 0).toLocaleString() })}`}
+                iconBg="bg-teal-600"
+              />
+            </div>
           </div>
 
           {/* ── Running Campaigns ──────────────────────────────────────── */}

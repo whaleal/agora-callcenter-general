@@ -17,20 +17,14 @@ from app.services.env_scope import (
     campaign_scope_filter,
     current_app_id,
     load_local_agent_ids,
+    require_campaign_in_scope,
 )
+from app.services.agora_http import agora_headers as _headers
 
 router = APIRouter(prefix='/api/campaigns-v2', tags=['campaigns-v2'])
 
 CAMPAIGN_BASE_URL = f'{settings.agora_conversational_base_url}/campaigns'
 TERMINAL_STATUSES = {'completed', 'interrupted', 'interrupt', 'failed'}
-
-
-def _headers() -> dict:
-    return {
-        'Authorization': f'Basic {settings.agora_conversational_api_key}',
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-    }
 
 
 class EndCallConfig(BaseModel):
@@ -411,6 +405,7 @@ async def get_campaign(
 
 @router.post('/{campaign_id}/interrupt')
 async def interrupt_campaign(campaign_id: str, db: AsyncSession = Depends(get_db)):
+    await require_campaign_in_scope(db, campaign_id)
     async with httpx.AsyncClient(timeout=15) as client:
         resp = await client.patch(
             f'{CAMPAIGN_BASE_URL}/{campaign_id}',
